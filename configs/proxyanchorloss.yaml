@@ -1,0 +1,112 @@
+model:
+  base_learning_rate: 0.00001
+  weight_decay: 0.0004
+  gamma: 0.3
+  tau: [1000]
+  scheduler: "step"
+  target: models.dml_model.DML_Model
+  params:
+    config:
+      Architecture:
+        target: architectures.bninception.Network
+        params:
+          pretraining: "imagenet"
+          embed_dim: 512
+          arch: "bninception_frozen_normalize" # deit_small_patch16_224, resnet50_frozen_normalize
+
+      Loss:
+        target: criteria.select
+        name: "oproxy"
+        params:
+          name: "oproxy"
+          batchminer:
+          n_classes: -1
+          embed_dim: 384 # equal to general model embed_dim
+          lr: 0.00001 # equal to general model lr
+          loss_oproxy_lrmulti: 2000
+          loss_oproxy_pos_alpha: 32
+          loss_oproxy_pos_delta: 0.1
+          loss_oproxy_neg_alpha: 32
+          loss_oproxy_neg_delta: 0.1
+          loss_oproxy_mode: "anchor"
+          loss_oproxy_detach_proxies: False
+          loss_oproxy_euclidean: False
+          loss_oproxy_unique: False
+          loss_oproxy_warmup_it: 0
+
+      Evaluation:
+        target: metrics.metric_computer.MetricComputer
+        params:
+          metric_names: ["e_recall@1", "nmi"]
+          n_classes: -1
+          evaluate_on_gpu: True
+          num_workers: 0
+
+      CustomLogs:
+        target: models.log.custom_logging
+
+data:
+  target: data.base.DataModuleFromConfig
+  params:
+    batch_size: 112
+    num_workers: 20
+
+    train:
+      target: data.CUB200.DATA
+      params: 
+        root:
+        train: True
+        arch: "bninception_frozen_normalize" # resnet50_frozen_normalize
+      data_sampler:
+        target: datasampler.select
+        params:
+          name: "class_random"
+          samples_per_class: 2
+
+    validation:
+      target: data.CUB200.DATA
+      params:
+        root:
+        train: False
+        arch: "bninception_frozen_normalize" # resnet50_frozen_normalize
+
+lightning:
+  trainer:
+    # accelerator: 'ddp'
+    # accumulate_grad_batches: 1
+    auto_scale_batch_size: false
+    benchmark: False
+    deterministic: True
+    amp_backend: 'native'
+    #amp_level: '02'
+    log_every_n_steps: 25
+    check_val_every_n_epoch: 1
+    max_epochs: 100
+    num_sanity_val_steps: -1
+
+  logger:
+    target: pytorch_lightning.loggers.WandbLogger
+    params:
+      wandb_key:
+      project: DML_PL
+      group: baselines
+      savename: test
+
+  modelcheckpoint:
+    target: pytorch_lightning.callbacks.ModelCheckpoint
+    params:
+      dirpath: ''
+      filename: 'recall@1{val/e_recall@1:.4f}'
+      monitor: 'val/e_recall@1'
+      mode: max
+      every_n_val_epochs: 1
+      verbose: True
+      save_last: True
+      save_top_k: 1
+  
+  callbacks:
+#    earlystopcallback:
+#      target: utils.callbacks.EarlyStoppingPL
+#      params:
+#        monitor: 'val/accuracy'
+#        min_delta: 0.0001
