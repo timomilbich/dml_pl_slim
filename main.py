@@ -150,9 +150,13 @@ if __name__ == "__main__":
     opt, unknown = parser.parse_known_args() # parser_kwargs_set
 
     ## Setup GPU's
-    GPUs = opt.gpus
+    if type(opt.gpus) is int:
+        opt.gpus = str(opt.gpus)
+
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = GPUs
+    os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpus
+    opt.gpus = list(opt.gpus.split(','))
+    print('GPUs to be used for training: {}'.format(opt.gpus))
 
     if opt.exp_path and opt.resume:
         raise ValueError(
@@ -199,7 +203,8 @@ if __name__ == "__main__":
         # default to ddp
         for k in nondefault_trainer_args(opt):
             trainer_config[k] = getattr(opt, k)
-        trainer_config['gpus'] = ",".join([str(i) for i in range(len(trainer_config['gpus'].strip(",").split(',')))])
+        # trainer_config['gpus'] = ",".join([str(i) for i in range(len(trainer_config['gpus'].strip(",").split(',')))])
+        trainer_config['gpus'] = list(range(len(trainer_config['gpus'])))
         trainer_opt = argparse.Namespace(**trainer_config)
         lightning_config.trainer = trainer_config
 

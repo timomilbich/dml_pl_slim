@@ -1,7 +1,7 @@
 import os
 from omegaconf import OmegaConf
 from pytorch_lightning.callbacks import Callback, EarlyStopping
-from pytorch_lightning.callbacks.progress import ProgressBar
+from pytorch_lightning.callbacks.progress import TQDMProgressBar
 from tqdm import tqdm as tqdm
 import sys
 
@@ -58,7 +58,7 @@ def EarlyStoppingPL(**args):
 
 
 
-class ProgressBarCallback(ProgressBar):
+class ProgressBarCallback(TQDMProgressBar):
 
     def __init__(self, run_name=None, refresh_rate: int = 1, process_position: int = 0):
         super().__init__(refresh_rate, process_position)

@@ -5,7 +5,14 @@
       <paths name="dml_pl">
         <serverdata>
           <mappings>
-            <mapping deploy="/export/compvis-nfs/user/tmilbich/PycharmProjects/dml_pl" local="$PROJECT_DIR$" />
+            <mapping deploy="/export/compvis-nfs/user/tmilbich/PycharmProjects/dml_pl" local="$PROJECT_DIR$/../dml_pl" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="dml_pl_slim">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/export/compvis-nfs/user/tmilbich/PycharmProjects/dml_pl_slim" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>

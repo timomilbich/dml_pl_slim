@@ -1,4 +1,4 @@
-export GPU_TRAINING=3,
+export GPU_TRAINING=5
 echo "GPUs: ${GPU_TRAINING}"
 export EXP_PATH='/export/data/tmilbich/PycharmProjects/dml_pl/experiments/training_models'
 echo "EXP_PATH: ${EXP_PATH}"
@@ -17,7 +17,7 @@ python main.py 'model.params.config.Architecture.params.embed_dim=512' 'lightnin
                'data.params.train.target=data.CUB200.DATA' 'data.params.validation.target=data.CUB200.DATA' \
                'model.params.config.Architecture.target=architectures.bninception.Network' 'model.params.config.Architecture.params.arch=bninception_frozen_normalize' \
                'data.params.train.params.arch=bninception_frozen_normalize' 'data.params.validation.params.arch=bninception_frozen_normalize' \
-              --savename baseline_multisimilarity_cub200_291121 --exp_path ${EXP_PATH} --gpus ${GPU_TRAINING} --base configs/multisimloss.yaml
+              --savename baseline_multisimilarity_cub200_011221 --exp_path ${EXP_PATH} --gpus ${GPU_TRAINING} --base configs/multisimloss.yaml
 
 #python main.py 'model.params.config.Architecture.params.embed_dim=512' 'lightning.logger.params.group=baselines' 'lightning.trainer.max_epochs=100' \
 #               'data.params.train.target=data.CUB200.DATA' 'data.params.validation.target=data.CUB200.DATA' \
