@@ -49,10 +49,12 @@ class BatchMiner():
 
             #negated log-distribution of distances of unit sphere in dimension <dim>
             log_q_d_inv = ((2.0 - float(dim)) * torch.log(dists) - (float(dim-3) / 2) * torch.log(1.0 - 0.25 * (dists.pow(2))))
-            log_q_d_inv[np.where(labels==anchor_label)[0]] = 0
+            for elem in np.where(labels==anchor_label)[0]:
+                log_q_d_inv[elem] = 0
 
             q_d_inv     = torch.exp(log_q_d_inv - torch.max(log_q_d_inv)) # - max(log) for stability
-            q_d_inv[np.where(labels==anchor_label)[0]] = 0
+            for elem in np.where(labels == anchor_label)[0]:
+                q_d_inv[elem] = 0
 
             ### NOTE: Cutting of values with high distances made the results slightly worse. It can also lead to
             # errors where there are no available negatives (for high samples_per_class cases).
