@@ -19,13 +19,6 @@ model:
           e_dim: 1024
           beta: 0.25
 
-      Vectorquantizer:
-        target: architectures.VQ.VectorQuantizer
-        params:
-          n_e: 1000
-          e_dim: 1024
-          beta: 0.25
-
       Loss:
         target: criteria.select
         name: "multisimilarity"
