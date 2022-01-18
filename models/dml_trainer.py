@@ -21,10 +21,15 @@ class DML_Model(pl.LightningModule):
         self.model = instantiate_from_config(config["Architecture"])
         self.config_arch = config["Architecture"]
 
+        ## Load the vector quantizer
+        self.vectorquantizer = instantiate_from_config(config["Vectorquantizer"])
+        self.config_vq = config["Vectorquantizer"]
+
         ## Init loss
         batchminer = instantiate_from_config(config["Batchmining"]) if "Batchmining" in config.keys() else None
         config["Loss"]["params"]['batchminer'] = batchminer
         self.loss = instantiate_from_config(config["Loss"])
+        self.vq_loss = 0
 
         ## Init constom log scripts
         self.custom_logs = instantiate_from_config(config["CustomLogs"])
@@ -49,8 +54,12 @@ class DML_Model(pl.LightningModule):
 
     def forward(self, x):
         out = self.model(x)
-        x = out['embeds'] # {'embeds': z, 'avg_features': y, 'features': x, 'extra_embeds': prepool_y}
-        return x
+        if len(out) == 5:
+            x, self.vq_loss = out['embeds'], out['vq_loss'] # {'embeds': z, 'avg_features': y, 'features': x, 'extra_embeds': prepool_y, 'vq_loss': vq_loss}
+            return x, self.vq_loss
+        else:
+            x = out['embeds']
+            return x
 
     def training_step(self, batch, batch_idx):
         ## Define one training step, the loss returned will be optimized
@@ -59,7 +68,14 @@ class DML_Model(pl.LightningModule):
         output = self.model(inputs)
 
         loss = self.loss(output['embeds'], labels, global_step=self.global_step, split="train") ## Change inputs to loss
-        self.log("Loss", loss, prog_bar=True, logger=True, on_step=False, on_epoch=True) ## Add to progressbar
+        #print(loss)
+        #print('2', self.vq_loss)
+        if len(output) == 5:
+            self.vq_loss = output['vq_loss']
+            self.log("Loss", loss + self.vq_loss, prog_bar=True, logger=True, on_step=False, on_epoch=True) ## Add to progressbar
+            self.log("VQ_Loss", self.vq_loss, prog_bar=True, logger=True, on_step=False, on_epoch=True)
+        else:
+            self.log("DML_Loss", loss, prog_bar=True, logger=True, on_step=False, on_epoch=True)  ## Add to progressbar
 
         # compute gradient magnitude
         mean_gradient_magnitude = 0.
@@ -67,8 +83,10 @@ class DML_Model(pl.LightningModule):
             for name, param in self.model.named_parameters():
                 if (param.requires_grad) and ("bias" not in name) and param.grad is not None:
                     mean_gradient_magnitude += param.grad.abs().mean().cpu().detach().numpy()
-
-        return {"loss": loss, "av_grad_mag": mean_gradient_magnitude}
+        if len(output) == 5:
+            return {"loss": loss+self.vq_loss, "av_grad_mag": mean_gradient_magnitude}
+        else:
+            return {"loss": loss, "av_grad_mag": mean_gradient_magnitude}
 
     def training_epoch_end(self, outputs):
         grad_mag_avs = np.mean([x["av_grad_mag"] for x in outputs])
@@ -89,12 +107,23 @@ class DML_Model(pl.LightningModule):
         with torch.no_grad():
             out = self.model(inputs)
             embeds = out['embeds']  # {'embeds': z, 'avg_features': y, 'features': x, 'extra_embeds': prepool_y}
+            features = out['features']
 
-        return {"embeds": embeds, "labels": labels}
+
+        return {"embeds": embeds, "labels": labels, "features": features}
 
     def validation_epoch_end(self, outputs):
         embeds = torch.cat([x["embeds"] for x in outputs]).cpu().detach()
         labels = torch.cat([x["labels"] for x in outputs]).cpu().detach()
+
+        #features = torch.cat([x["features"] for x in outputs]).cpu().detach()
+        #features = features[0:5824]
+        #features = features.reshape(112,52,1024,7,7)
+        #features = torch.mean(features,1)
+        #features = features.squeeze(1)
+        #print(features.shape)
+        #torch.save(features, "./Pretraining.pt")
+
 
         # perform validation
         computed_metrics = self.metric_computer.compute_standard(embeds, labels, self.device)

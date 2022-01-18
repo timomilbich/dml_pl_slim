@@ -25,7 +25,7 @@ def get_parser(**parser_kwargs):
         "--exp_path",
         type=str,
         const=True,
-        default="/export/home/tmilbich/PycharmProjects/dml_pl/experiments",
+        default="/export/home/zwu/dml_pl_slim/experiments",
         nargs="?",
         help="postfix for logdir",
     )
