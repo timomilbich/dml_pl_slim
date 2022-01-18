@@ -15,6 +15,9 @@ model:
           embed_dim: -1 # 512
           arch: "bninception_frozen_normalize" #"bninception_frozen_normalize", vit_small_patch16_224_normalize
           VQ: True
+          n_e: 1000
+          e_dim: 1024
+          beta: 0.25
 
       Vectorquantizer:
         target: architectures.VQ.VectorQuantizer
