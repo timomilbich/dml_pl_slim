@@ -8,17 +8,20 @@ from architectures.VQ import VectorQuantizer
 
 """============================================================="""
 class Network(torch.nn.Module):
-    def __init__(self, arch, pretraining, embed_dim, VQ, n_e = 2048, beta = 0.25, e_dim = 1024):
+    def __init__(self, arch, pretraining, embed_dim, VQ, n_e = 1000, beta = 0.25, e_dim = 1024):
         super(Network, self).__init__()
 
         self.arch  = arch
         self.embed_dim = embed_dim
         self.name = self.arch
         self.VQ = VQ
+        self.n_e = n_e
+        self.beta = beta
+        self.e_dim = e_dim
         self.model = ptm.__dict__['bninception'](num_classes=1000, pretrained=pretraining)
         self.model.last_linear = torch.nn.Linear(self.model.last_linear.in_features, embed_dim)
         if self.VQ:
-            self.VectorQuantizer = VectorQuantizer(n_e, e_dim, beta)
+            self.VectorQuantizer = VectorQuantizer(self.n_e, self.e_dim, self.beta)
         if '_he' in self.arch:
             torch.nn.init.kaiming_normal_(self.model.last_linear.weight, mode='fan_out')
             torch.nn.init.constant_(self.model.last_linear.bias, 0)
@@ -36,8 +39,6 @@ class Network(torch.nn.Module):
     def forward(self, x, warmup=False, **kwargs):
         # print('x', x.shape) = 112, 3, 224, 224
         x = self.model.features(x)
-        # torch.save(x, "./pretraining.pt")
-        # print('x: after features', x.shape) 112, 1024, 7, 7 --- 14 14  until 32 32
 
         # VQ features #########
         if self.VQ:
@@ -62,7 +63,6 @@ class Network(torch.nn.Module):
         z = self.model.last_linear(y)
         if 'normalize' in self.name:
             z = F.normalize(z, dim=-1)
-        # print(z.shape) 112 embed_dim
         if self.VQ:
             return {'embeds':z, 'avg_features':y, 'features':x, 'extra_embeds': prepool_y, 'vq_loss': vq_loss}
         else:
