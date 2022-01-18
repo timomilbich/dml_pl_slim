@@ -41,7 +41,7 @@ class Network(torch.nn.Module):
 
         # VQ features #########
         if self.VQ:
-            vq_loss, x = self.VectorQuantizer(x)
+            x, vq_loss = self.VectorQuantizer(x)
         ##########
 
         prepool_y = y = self.pool_base(x,kernel_size=x.shape[-1])
