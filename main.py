@@ -7,6 +7,8 @@ from pytorch_lightning.loggers import WandbLogger
 from utils.auxiliaries import instantiate_from_config, nondefault_trainer_args
 from utils.callbacks import SetupCallback, ProgressBarCallback
 from pytorch_lightning.profiler import SimpleProfiler, AdvancedProfiler
+from pytorch_lightning.plugins import DDPPlugin
+
 
 
 def get_parser(**parser_kwargs):
@@ -248,7 +250,7 @@ if __name__ == "__main__":
             trainer_kwargs["callbacks"] += [checkpoint_callback]
 
         ## Define Trainer
-        trainer = Trainer.from_argparse_args(trainer_opt, **trainer_kwargs)
+        trainer = Trainer.from_argparse_args(trainer_opt, **trainer_kwargs, strategy=DDPPlugin(find_unused_parameters=False))
         weight_decay, gamma, scheduler, tau, type_optim = config.model.weight_decay, config.model.gamma, config.model.scheduler, config.model.tau, config.model.type_optim
         model.type_optim = type_optim
         model.weight_decay = weight_decay
@@ -264,7 +266,7 @@ if __name__ == "__main__":
         if opt.train:
             # trainer.tune(model, data)
             trainer.fit(model, data)
-            trainer.test(model, data)
+            # trainer.test(model, data)
     except Exception:
         # move newly created debug project to debug_runs
         raise
