@@ -12,7 +12,14 @@
       <paths name="dml_pl_slim">
         <serverdata>
           <mappings>
-            <mapping deploy="/export/compvis-nfs/user/tmilbich/PycharmProjects/dml_pl_slim" local="$PROJECT_DIR$" />
+            <mapping deploy="/export/compvis-nfs/user/tmilbich/PycharmProjects/dml_pl_slim" local="$PROJECT_DIR$/../dml_pl_slim" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="vqdml">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/export/compvis-nfs/user/tmilbich/PycharmProjects/VQ-DML" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>

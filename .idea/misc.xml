@@ -3,7 +3,7 @@
   <component name="JavaScriptSettings">
     <option name="languageLevel" value="ES6" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="Remote Python 3.7.10 (sftp://tmilbich@compgpu4.iwr.uni-heidelberg.de:22/export/home/tmilbich/miniconda3/envs/cb/bin/python3.7)" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="Remote Python 3.7.12 (sftp://tmilbich@hfdhgpu2.iwr.uni-heidelberg.de:22/export/home/tmilbich/miniconda3/envs/vqdml/bin/python3.7)" project-jdk-type="Python SDK" />
   <component name="PyPackaging">
     <option name="earlyReleasesAsUpgrades" value="true" />
   </component>

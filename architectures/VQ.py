@@ -312,11 +312,10 @@ class VectorQuantizer(nn.Module):
             min_encoding_indices = min_encoding_indices.reshape(-1,1) # flatten
 
         if self.sane_index_shape:
-            min_encoding_indices = min_encoding_indices.reshape(
-                z_q.shape[0], z_q.shape[2], z_q.shape[3])
+            min_encoding_indices = min_encoding_indices.reshape(z_q.shape[0], z_q.shape[2], z_q.shape[3])
 	
-	return z_q, loss
-#        return z_q, loss, (perplexity, min_encodings, min_encoding_indices)
+        return z_q, loss
+       # return z_q, loss, (perplexity, min_encodings, min_encoding_indices)
 
     def get_codebook_entry(self, indices, shape):
         # shape specifying (batch, height, width, channel)

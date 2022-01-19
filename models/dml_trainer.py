@@ -63,8 +63,9 @@ class DML_Model(pl.LightningModule):
         output = self.model(inputs)
 
         loss = self.loss(output['embeds'], labels, global_step=self.global_step, split="train") ## Change inputs to loss
-        vq_loss = output['vq_loss']
-        if len(output) == 5:
+
+        if self.model.VQ:
+            vq_loss = output['vq_loss']
             self.log("DML_Loss", loss, prog_bar=True, logger=True, on_step=False, on_epoch=True) ## Add to progressbar
             self.log("VQ_Loss", vq_loss, prog_bar=True, logger=True, on_step=False, on_epoch=True)
         else:

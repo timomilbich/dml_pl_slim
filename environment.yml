@@ -1,4 +1,4 @@
-name: cb2
+name: vqdml
 channels:
    - conda-forge
    - pytorch

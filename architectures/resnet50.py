@@ -3,17 +3,24 @@ The network architectures and weights are adapted and used from the great https:
 """
 import torch, torch.nn as nn
 import pretrainedmodels as ptm
-
+from architectures.VQ import VectorQuantizer
 
 """============================================================="""
 class Network(torch.nn.Module):
-    def __init__(self, arch, pretraining, embed_dim):
+    def __init__(self, arch, pretraining, embed_dim, VQ, n_e=1000, beta=0.25, e_dim=1024):
         super(Network, self).__init__()
 
         self.arch = arch
         self.embed_dim = embed_dim
         self.model = ptm.__dict__['resnet50'](num_classes=1000, pretrained=pretraining if pretraining=='imagenet' else None)
         self.name = self.arch
+        self.VQ = VQ
+        self.n_e = n_e
+        self.beta = beta
+        self.e_dim = e_dim
+
+        if self.VQ:
+            self.VectorQuantizer = VectorQuantizer(self.n_e, self.e_dim, self.beta)
 
         if 'frozen' in self.arch:
             for module in filter(lambda m: type(m) == nn.BatchNorm2d, self.model.modules()):
@@ -34,6 +41,12 @@ class Network(torch.nn.Module):
         for layerblock in self.layer_blocks:
             x = layerblock(x)
         prepool_y = x
+
+        # VQ features #########
+        if self.VQ:
+            x, vq_loss = self.VectorQuantizer(x)
+        ##########
+
         if self.pool_aux is not None:
             y = self.pool_aux(x) + self.pool_base(x)
         else:
@@ -48,4 +61,7 @@ class Network(torch.nn.Module):
         if 'normalize' in self.arch:
             z = torch.nn.functional.normalize(z, dim=-1)
 
-        return {'embeds':z, 'avg_features':y, 'features':x, 'extra_embeds': prepool_y}
+        if self.VQ:
+            return {'embeds': z, 'avg_features': y, 'features': x, 'extra_embeds': prepool_y, 'vq_loss': vq_loss}
+        else:
+            return {'embeds': z, 'avg_features': y, 'features': x, 'extra_embeds': prepool_y}

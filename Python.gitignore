@@ -2,6 +2,9 @@
 architectures/pretrained_weights/*.pth
 third_party
 
+# run files
+runs/baselines_vq.sh
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
