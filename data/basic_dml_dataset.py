@@ -10,7 +10,13 @@ class BaseDataset(Dataset):
         self.is_validation = is_validation
         self.arch        = arch
         self.path_ooDML_splits = None
-
+        if "imSize" in self.arch:
+            # quick hack to change the image size
+            self.crop_size = int(self.arch[self.arch.find("imSize")+6:])
+            self.resize = int(self.crop_size * 256 / 224)
+        else:
+            self.crop_size = 224 if 'googlenet' not in self.arch else 227
+            self.resize = 256
         #####
         self.image_dict = image_dict
 
@@ -26,14 +32,14 @@ class BaseDataset(Dataset):
             self.f_norm = normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5],std=[0.5, 0.5, 0.5])
         else:
             self.f_norm = normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])
-        self.crop_size = crop_im_size = 224 if 'googlenet' not in self.arch else 227
+        crop_im_size = self.crop_size
 
         #############
         self.normal_transform = []
         if not self.is_validation:
             self.normal_transform.extend([transforms.RandomResizedCrop(size=crop_im_size), transforms.RandomHorizontalFlip(0.5)])
         else:
-            self.normal_transform.extend([transforms.Resize(256), transforms.CenterCrop(crop_im_size)])
+            self.normal_transform.extend([transforms.Resize(self.resize), transforms.CenterCrop(crop_im_size)])
         self.normal_transform.extend([transforms.ToTensor(), normalize])
         self.normal_transform = transforms.Compose(self.normal_transform)
 
