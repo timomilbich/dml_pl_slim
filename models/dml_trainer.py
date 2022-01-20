@@ -50,7 +50,7 @@ class DML_Model(pl.LightningModule):
 
     def forward(self, x):
         out = self.model(x)
-        if len(out) == 5:
+        if self.model.VQ:
             x, vqloss = out['embeds'], out['vq_loss'] # {'embeds': z, 'avg_features': y, 'features': x, 'extra_embeds': prepool_y, 'vq_loss': vq_loss}
             return x, vqloss
         else:
@@ -63,13 +63,17 @@ class DML_Model(pl.LightningModule):
         labels = batch[1]
         output = self.model(inputs)
 
-        loss = self.loss(output['embeds'], labels, global_step=self.global_step, split="train") ## Change inputs to loss
+        dml_loss = self.loss(output['embeds'], labels, global_step=self.global_step, split="train") ## Change inputs to loss
 
         if self.model.VQ:
             vq_loss = output['vq_loss']
-            self.log("DML_Loss", loss, prog_bar=True, logger=True, on_step=False, on_epoch=True) ## Add to progressbar
+            loss = dml_loss + vq_loss
+            
+            self.log("Loss", loss, prog_bar=True, logger=True, on_step=False, on_epoch=True) ## Add to progressbar
+            self.log("DML_Loss", dml_loss, prog_bar=True, logger=True, on_step=False, on_epoch=True)
             self.log("VQ_Loss", vq_loss, prog_bar=True, logger=True, on_step=False, on_epoch=True)
         else:
+            loss = dml_loss
             self.log("Loss", loss, prog_bar=True, logger=True, on_step=False, on_epoch=True)  ## Add to progressbar
 
         # compute gradient magnitude
@@ -78,10 +82,7 @@ class DML_Model(pl.LightningModule):
             for name, param in self.model.named_parameters():
                 if (param.requires_grad) and ("bias" not in name) and param.grad is not None:
                     mean_gradient_magnitude += param.grad.abs().mean().cpu().detach().numpy()
-        if len(output) == 5:
-            return {"loss": loss+vq_loss, "av_grad_mag": mean_gradient_magnitude}
-        else:
-            return {"loss": loss, "av_grad_mag": mean_gradient_magnitude}
+        return {"loss": loss, "av_grad_mag": mean_gradient_magnitude}
 
     def training_epoch_end(self, outputs):
         grad_mag_avs = np.mean([x["av_grad_mag"] for x in outputs])
