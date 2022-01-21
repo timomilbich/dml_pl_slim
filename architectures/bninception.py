@@ -45,6 +45,7 @@ class Network(torch.nn.Module):
 
         # print('x', x.shape) = 112, 3, 224, 224
         x = self.model.features(x)
+        prepool_y = x
 
         # VQ features #########
         if self.VQ:
@@ -56,7 +57,7 @@ class Network(torch.nn.Module):
                 cluster_use = 0
         ##########
 
-        prepool_y = y = self.pool_base(x,kernel_size=x.shape[-1])
+        y = self.pool_base(x,kernel_size=x.shape[-1])
         # print('prepool y', prepool_y.shape)  112, 1024, 1, 1
         if self.pool_aux is not None:
             y += self.pool_aux(x, kernel_size=x.shape[-1])

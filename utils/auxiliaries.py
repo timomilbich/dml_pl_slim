@@ -17,9 +17,6 @@ def extract_features(model, dataloader):
 
                 feat = rearrange(out['extra_embeds'], 'b c h w -> b h w c').contiguous()
                 feat = feat.view(-1, feat.shape[-1])
-
-                # feat = torch.permute(out['extra_embeds'], (0, 2, 3, 1))
-                # feat = torch.reshape(feat, (-1, 2048 ))
                 features.append(feat)
 
             return torch.cat([feat for feat in features]).cpu().detach().numpy()
