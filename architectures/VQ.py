@@ -114,7 +114,9 @@ class VectorQuantizer(nn.Module):
         if self.sane_index_shape:
             min_encoding_indices = min_encoding_indices.reshape(z_q.shape[0], z_q.shape[2], z_q.shape[3])
 
-        return z_q, loss
+        perplexity, cluster_use = self.measure_perplexity(min_encoding_indices, self.n_e)
+
+        return z_q, loss, perplexity, cluster_use
 
     # return z_q, loss, (perplexity, min_encodings, min_encoding_indices)
 
@@ -135,7 +137,7 @@ class VectorQuantizer(nn.Module):
 
         return z_q
 
-    def init_codebook_by_clustering(self, features, evaluate_on_gpu=True, n_max=50000):
+    def init_codebook_by_clustering(self, features, evaluate_on_gpu=True, n_max=100000):
 
         ### Prepare features
         features = features.astype(np.float32)
@@ -168,6 +170,13 @@ class VectorQuantizer(nn.Module):
 
         ### empty cache on GPU
         torch.cuda.empty_cache()
+
+    def measure_perplexity(self, predicted_indices, n_embed):  # eval cluster perplexity. when perplexity == num_embeddings then all clusters are used exactly equally
+        encodings = F.one_hot(predicted_indices, n_embed).float().reshape(-1, n_embed)
+        avg_probs = encodings.mean(0)
+        perplexity = (-(avg_probs * torch.log(avg_probs + 1e-10)).sum()).exp()
+        cluster_use = torch.sum(avg_probs > 0)
+        return perplexity, cluster_use
 
 class VectorQuantizer_old(nn.Module):
     """

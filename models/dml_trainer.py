@@ -88,13 +88,32 @@ class DML_Model(pl.LightningModule):
                 if (param.requires_grad) and ("bias" not in name) and param.grad is not None:
                     mean_gradient_magnitude += param.grad.abs().mean().cpu().detach().numpy()
 
-        return {"loss": loss, "av_grad_mag": mean_gradient_magnitude}
+        out_dict = {"loss": loss, "av_grad_mag": mean_gradient_magnitude}
+        if 'vq_perplexity' in output.keys():
+            vq_perp = float(output['vq_perplexity'].cpu().detach().numpy())
+            self.log("vq_perp", vq_perp, prog_bar=True, logger=False, on_step=False, on_epoch=True)
+            out_dict['vq_perplexity'] = vq_perp
+
+        if 'vq_cluster_use' in output.keys():
+            vq_clust_use = float(output['vq_cluster_use'].cpu().detach().numpy())
+            self.log("vq_cl_use", vq_clust_use, prog_bar=True, logger=False, on_step=False, on_epoch=True)
+            out_dict['vq_cluster_use'] = vq_clust_use
+
+        return out_dict
 
     def training_epoch_end(self, outputs):
         grad_mag_avs = np.mean([x["av_grad_mag"] for x in outputs])
 
         # log results
         log_data = {f"grad_mag_avs": grad_mag_avs}
+
+        if 'vq_perplexity' in outputs[0].keys():
+            vq_perplexity_avs = np.mean([x["vq_perplexity"] for x in outputs])
+            log_data = {**log_data, f"vq_perplexity": vq_perplexity_avs}
+
+        if 'vq_cluster_use' in outputs[0].keys():
+            vq_cluster_use_avs = np.mean([x["vq_cluster_use"] for x in outputs])
+            log_data = {**log_data, f"vq_cluster_use": vq_cluster_use_avs}
 
         if self.loss.REQUIRES_LOGGING:
             loss_log_data = self.loss.get_log_data()

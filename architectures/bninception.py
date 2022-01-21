@@ -49,9 +49,11 @@ class Network(torch.nn.Module):
         # VQ features #########
         if self.VQ:
             if quantize:
-                x, vq_loss = self.VectorQuantizer(x)
+                x, vq_loss, perplexity, cluster_use = self.VectorQuantizer(x)
             else:
                 vq_loss = 0
+                perplexity = 0
+                cluster_use = 0
         ##########
 
         prepool_y = y = self.pool_base(x,kernel_size=x.shape[-1])
@@ -73,6 +75,6 @@ class Network(torch.nn.Module):
         if 'normalize' in self.name:
             z = F.normalize(z, dim=-1)
         if self.VQ:
-            return {'embeds':z, 'avg_features':y, 'features':x, 'extra_embeds': prepool_y, 'vq_loss': vq_loss}
+            return {'embeds': z, 'avg_features': y, 'features': x, 'extra_embeds': prepool_y, 'vq_loss': vq_loss, 'vq_perplexity': perplexity, 'vq_cluster_use': cluster_use}
         else:
             return {'embeds': z, 'avg_features': y, 'features': x, 'extra_embeds': prepool_y}

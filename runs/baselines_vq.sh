@@ -31,9 +31,9 @@ python main.py 'model.params.config.Architecture.params.embed_dim=512' 'lightnin
                'data.params.train.target=data.CUB200.DATA' 'data.params.validation.target=data.CUB200.DATA' \
                'model.params.config.Architecture.target=architectures.resnet50.Network' 'model.params.config.Architecture.params.arch=resnet50_frozen_normalize' \
                'data.params.train.params.arch=resnet50_frozen_normalize' 'data.params.validation.params.arch=resnet50_frozen_normalize' \
-               'model.params.config.Architecture.params.VQ=True' 'model.params.config.Architecture.params.n_e=500' 'model.params.config.Architecture.params.e_dim=2048' \
+               'model.params.config.Architecture.params.VQ=True' 'model.params.config.Architecture.params.n_e=3000' 'model.params.config.Architecture.params.e_dim=2048' \
                'model.params.config.Architecture.params.e_init=feature_clustering' \
-                --savename baseline_resnet50_vq500_ClusterInit_512_multisimilarity_cub200 --exp_path ${EXP_PATH} --gpus ${GPU_TRAINING} --base configs/multisimloss.yaml
+                --savename baseline_resnet50_vq3000_ClusterInit_512_multisimilarity_cub200 --exp_path ${EXP_PATH} --gpus ${GPU_TRAINING} --base configs/multisimloss.yaml
 
 ### ... larger image resolution during training, plz change the batch size accordingly
 # python main.py 'model.params.config.Architecture.params.embed_dim=512' 'lightning.logger.params.group=baselines' "lightning.logger.params.wandb_key=${WANDB_KEY}" 'lightning.trainer.max_epochs=100' \
