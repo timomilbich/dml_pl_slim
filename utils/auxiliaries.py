@@ -1,10 +1,31 @@
 import importlib
-import numpy as np
-import os
-import pickle
 import argparse
 from pytorch_lightning.trainer import Trainer
-import pytorch_lightning as pl
+from einops import rearrange
+
+from tqdm import tqdm
+import torch
+
+def extract_features(model, dataloader):
+
+    features = list()
+    with torch.no_grad():
+        with tqdm(dataloader, desc ="Extracting features...") as tqdm_loader:
+
+            for i, data in enumerate(tqdm_loader):
+                out = model(data[0].cuda(), quantize=False)
+
+                feat = rearrange(out['extra_embeds'], 'b c h w -> b h w c').contiguous()
+                feat = feat.view(-1, feat.shape[-1])
+
+                # feat = torch.permute(out['extra_embeds'], (0, 2, 3, 1))
+                # feat = torch.reshape(feat, (-1, 2048 ))
+                features.append(feat)
+
+            return torch.cat([feat for feat in features]).cpu().detach().numpy()
+
+
+#############################################
 
 
 def get_obj_from_str(string, reload=False):

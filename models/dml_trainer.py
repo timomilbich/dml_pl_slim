@@ -2,9 +2,8 @@ import numpy as np
 import torch
 import pytorch_lightning as pl
 from omegaconf import OmegaConf
-from utils.auxiliaries import instantiate_from_config
+from utils.auxiliaries import instantiate_from_config, extract_features
 from criteria import add_criterion_optim_params
-
 
 
 class DML_Model(pl.LightningModule):
@@ -20,6 +19,17 @@ class DML_Model(pl.LightningModule):
 
         ## Load model using config
         self.model = instantiate_from_config(config["Architecture"])
+
+        if self.model.VQ and self.model.e_init == 'feature_clustering':
+            ## init dataloader:
+            tmp_dataloader = instantiate_from_config(config["Optional_dataloader"]).val_dataloader()
+
+            ## extract features
+            features = extract_features(self.model.cuda(), tmp_dataloader)
+
+            ## init VQ using feature clustering
+            self.model.VectorQuantizer.init_codebook_by_clustering(features)
+
         self.config_arch = config["Architecture"]
 
         ## Init loss
@@ -50,7 +60,8 @@ class DML_Model(pl.LightningModule):
 
     def forward(self, x):
         out = self.model(x)
-        if self.model.VQ:
+
+        if 'vq_loss' in out.keys():
             x, vqloss = out['embeds'], out['vq_loss'] # {'embeds': z, 'avg_features': y, 'features': x, 'extra_embeds': prepool_y, 'vq_loss': vq_loss}
             return x, vqloss
         else:
@@ -62,19 +73,13 @@ class DML_Model(pl.LightningModule):
         inputs = batch[0]
         labels = batch[1]
         output = self.model(inputs)
+        loss = self.loss(output['embeds'], labels, global_step=self.global_step, split="train") ## Change inputs to loss
+        self.log("DML_Loss", loss, prog_bar=True, logger=True, on_step=False, on_epoch=True)  ## Add to progressbar
 
-        dml_loss = self.loss(output['embeds'], labels, global_step=self.global_step, split="train") ## Change inputs to loss
-
-        if self.model.VQ:
+        if 'vq_loss' in output.keys():
             vq_loss = output['vq_loss']
-            loss = dml_loss + vq_loss
-            
-            self.log("Loss", loss, prog_bar=True, logger=True, on_step=False, on_epoch=True) ## Add to progressbar
-            self.log("DML_Loss", dml_loss, prog_bar=True, logger=True, on_step=False, on_epoch=True)
             self.log("VQ_Loss", vq_loss, prog_bar=True, logger=True, on_step=False, on_epoch=True)
-        else:
-            loss = dml_loss
-            self.log("Loss", loss, prog_bar=True, logger=True, on_step=False, on_epoch=True)  ## Add to progressbar
+            loss = loss + vq_loss
 
         # compute gradient magnitude
         mean_gradient_magnitude = 0.
@@ -82,6 +87,7 @@ class DML_Model(pl.LightningModule):
             for name, param in self.model.named_parameters():
                 if (param.requires_grad) and ("bias" not in name) and param.grad is not None:
                     mean_gradient_magnitude += param.grad.abs().mean().cpu().detach().numpy()
+
         return {"loss": loss, "av_grad_mag": mean_gradient_magnitude}
 
     def training_epoch_end(self, outputs):

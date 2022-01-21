@@ -15,6 +15,7 @@ model:
           embed_dim: -1 # 512
           arch: "bninception_frozen_normalize" #"bninception_frozen_normalize", vit_small_patch16_224_normalize
           VQ: True
+          e_init: 'random_uniform'
           n_e: 1000
           e_dim: 1024
           beta: 0.25
@@ -45,6 +46,21 @@ model:
 
       CustomLogs:
         target: models.log.custom_logging
+
+
+      Optional_dataloader: # required for VQ-'feature_clustering' initialization
+        target: data.base.DataModuleFromConfig
+        params:
+          batch_size: 112
+          num_workers: 20
+
+          validation:
+            target: data.CUB200.DATA
+            params:
+              root:
+              train: True
+              ooDML_split_id: -1
+              arch: "resnet50_frozen_normalize" # vit_small_patch16_224_normalize
 
 data:
   target: data.base.DataModuleFromConfig
@@ -80,7 +96,7 @@ lightning:
 #     accumulate_grad_batches: 1
     auto_scale_batch_size: false
     benchmark: False
-    deterministic: True
+    deterministic: False
     amp_backend: 'native'
     #amp_level: '02'
     log_every_n_steps: 25

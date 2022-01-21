@@ -8,7 +8,7 @@ from architectures.VQ import VectorQuantizer
 
 """============================================================="""
 class Network(torch.nn.Module):
-    def __init__(self, arch, pretraining, embed_dim, VQ, n_e = 1000, beta = 0.25, e_dim = 1024):
+    def __init__(self, arch, pretraining, embed_dim, VQ, n_e = 1000, beta = 0.25, e_dim = 1024, e_init='random_uniform'):
         super(Network, self).__init__()
 
         self.arch  = arch
@@ -18,10 +18,13 @@ class Network(torch.nn.Module):
         self.n_e = n_e
         self.beta = beta
         self.e_dim = e_dim
+        self.e_init = e_init
         self.model = ptm.__dict__['bninception'](num_classes=1000, pretrained=pretraining)
         self.model.last_linear = torch.nn.Linear(self.model.last_linear.in_features, embed_dim)
+
         if self.VQ:
-            self.VectorQuantizer = VectorQuantizer(self.n_e, self.e_dim, self.beta)
+            self.VectorQuantizer = VectorQuantizer(self.n_e, self.e_dim, self.beta, self.e_init)
+
         if '_he' in self.arch:
             torch.nn.init.kaiming_normal_(self.model.last_linear.weight, mode='fan_out')
             torch.nn.init.constant_(self.model.last_linear.bias, 0)
@@ -36,13 +39,19 @@ class Network(torch.nn.Module):
 
         print(f'ARCHITECTURE:\ntype: {self.arch}\nembed_dims: {self.embed_dim}\n')
 
-    def forward(self, x, warmup=False, **kwargs):
+    def forward(self, x, warmup=False, quantize=True, **kwargs):
+        # quantize argument is needed to turn off quantization for initial features
+        # extracting before clustering initialization
+
         # print('x', x.shape) = 112, 3, 224, 224
         x = self.model.features(x)
 
         # VQ features #########
         if self.VQ:
-            x, vq_loss = self.VectorQuantizer(x)
+            if quantize:
+                x, vq_loss = self.VectorQuantizer(x)
+            else:
+                vq_loss = 0
         ##########
 
         prepool_y = y = self.pool_base(x,kernel_size=x.shape[-1])

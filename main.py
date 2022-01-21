@@ -10,7 +10,6 @@ from pytorch_lightning.profiler import SimpleProfiler, AdvancedProfiler
 from pytorch_lightning.plugins import DDPPlugin
 
 
-
 def get_parser(**parser_kwargs):
     def str2bool(v):
         if isinstance(v, bool):

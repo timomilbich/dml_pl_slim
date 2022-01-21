@@ -4,10 +4,11 @@ The network architectures and weights are adapted and used from the great https:
 import torch, torch.nn as nn
 import pretrainedmodels as ptm
 from architectures.VQ import VectorQuantizer
+import argparse
 
 """============================================================="""
 class Network(torch.nn.Module):
-    def __init__(self, arch, pretraining, embed_dim, VQ, n_e=1000, beta=0.25, e_dim=1024):
+    def __init__(self, arch, pretraining, embed_dim, VQ, n_e=1000, beta=0.25, e_dim=1024, e_init='uniform'):
         super(Network, self).__init__()
 
         self.arch = arch
@@ -18,9 +19,10 @@ class Network(torch.nn.Module):
         self.n_e = n_e
         self.beta = beta
         self.e_dim = e_dim
+        self.e_init = e_init
 
         if self.VQ:
-            self.VectorQuantizer = VectorQuantizer(self.n_e, self.e_dim, self.beta)
+            self.VectorQuantizer = VectorQuantizer(self.n_e, self.e_dim, self.beta, self.e_init)
 
         if 'frozen' in self.arch:
             for module in filter(lambda m: type(m) == nn.BatchNorm2d, self.model.modules()):
@@ -36,15 +38,21 @@ class Network(torch.nn.Module):
         print(f'ARCHITECTURE:\ntype: {self.arch}\nembed_dims: {self.embed_dim}\n')
 
 
-    def forward(self, x, warmup=False, **kwargs):
+    def forward(self, x, warmup=False, quantize=True, **kwargs):
+        # quantize argument is needed to turn off quantization for initial features
+        # extracting before clustering initialization
+
         x = self.model.maxpool(self.model.relu(self.model.bn1(self.model.conv1(x))))
-        for layerblock in self.layer_blocks:
+        for k, layerblock in enumerate(self.layer_blocks):
             x = layerblock(x)
         prepool_y = x
 
         # VQ features #########
         if self.VQ:
-            x, vq_loss = self.VectorQuantizer(x)
+            if quantize:
+                x, vq_loss = self.VectorQuantizer(x)
+            else:
+                vq_loss = 0
         ##########
 
         if self.pool_aux is not None:
