@@ -1,8 +1,4 @@
-<<<<<<< Updated upstream
-export GPU_TRAINING=2
-=======
 export GPU_TRAINING=5
->>>>>>> Stashed changes
 echo "GPUs: ${GPU_TRAINING}"
 export EXP_PATH='/export/data/tmilbich/PycharmProjects/VQ-DML/experiments/training_models'
 echo "EXP_PATH: ${EXP_PATH}"
@@ -21,13 +17,23 @@ echo "WANDB_KEY: ${WANDB_KEY}"
 #               'model.params.config.Architecture.params.e_init=random_uniform' \
 #                --savename baseline_bninception_vq500_UnifInit100_512_multisimilarity_cub200 --exp_path ${EXP_PATH} --gpus ${GPU_TRAINING} --base configs/multisimloss.yaml
 
+### ... usage of random_uniform intialization for codebook initialization with resnet50
+#python main.py 'model.params.config.Architecture.params.embed_dim=512' 'lightning.logger.params.group=baselines' "lightning.logger.params.wandb_key=${WANDB_KEY}" 'lightning.trainer.max_epochs=100' \
+#               'data.params.train.target=data.CUB200.DATA' 'data.params.validation.target=data.CUB200.DATA' \
+#               'model.params.config.Architecture.target=architectures.resnet50.Network' 'model.params.config.Architecture.params.arch=resnet50_frozen_normalize' \
+#               'data.params.train.params.arch=resnet50_frozen_normalize' 'data.params.validation.params.arch=resnet50_frozen_normalize' \
+#               'model.params.config.Architecture.params.VQ=True' 'model.params.config.Architecture.params.n_e=500' 'model.params.config.Architecture.params.e_dim=2048' \
+#               'model.params.config.Architecture.params.e_init=random_uniform' \
+#                --savename baseline_resnet50_vq500_UnifInit100_512_multisimilarity_cub200 --exp_path ${EXP_PATH} --gpus ${GPU_TRAINING} --base configs/multisimloss.yaml
+
+### ... usage of feature_clustering for codebook initialization with resnet50
 python main.py 'model.params.config.Architecture.params.embed_dim=512' 'lightning.logger.params.group=baselines' "lightning.logger.params.wandb_key=${WANDB_KEY}" 'lightning.trainer.max_epochs=100' \
                'data.params.train.target=data.CUB200.DATA' 'data.params.validation.target=data.CUB200.DATA' \
                'model.params.config.Architecture.target=architectures.resnet50.Network' 'model.params.config.Architecture.params.arch=resnet50_frozen_normalize' \
                'data.params.train.params.arch=resnet50_frozen_normalize' 'data.params.validation.params.arch=resnet50_frozen_normalize' \
                'model.params.config.Architecture.params.VQ=True' 'model.params.config.Architecture.params.n_e=500' 'model.params.config.Architecture.params.e_dim=2048' \
-               'model.params.config.Architecture.params.e_init=random_uniform' \
-                --savename baseline_resnet50_vq500_UnifInit100_512_multisimilarity_cub200 --exp_path ${EXP_PATH} --gpus ${GPU_TRAINING} --base configs/multisimloss.yaml
+               'model.params.config.Architecture.params.e_init=feature_clustering' \
+                --savename baseline_resnet50_vq500_ClusterInit_512_multisimilarity_cub200 --exp_path ${EXP_PATH} --gpus ${GPU_TRAINING} --base configs/multisimloss.yaml
 
 ### ... larger image resolution during training, plz change the batch size accordingly
 # python main.py 'model.params.config.Architecture.params.embed_dim=512' 'lightning.logger.params.group=baselines' "lightning.logger.params.wandb_key=${WANDB_KEY}" 'lightning.trainer.max_epochs=100' \
