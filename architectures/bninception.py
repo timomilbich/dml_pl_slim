@@ -48,8 +48,11 @@ class Network(torch.nn.Module):
         # quantize argument is needed to turn off quantization for initial features
         # extracting before clustering initialization
 
-        # print('x', x.shape) = 112, 3, 224, 224
         x = self.model.features(x)
+        ###### 1*1 conv
+        conv = nn.Conv2d(in_channels=x.shape[1], out_channels=self.e_dim, kernel_size=1, stride=1, padding=0).cuda()
+        x = conv(x)
+        ######
         prepool_y = x
 
         # VQ features #########
@@ -74,8 +77,6 @@ class Network(torch.nn.Module):
         y = y.view(len(x),-1)
         if warmup:
             x,y,prepool_y = x.detach(), y.detach(), prepool_y.detach()
-
-        # print('y', y.shape) = 112, 1024
 
         z = self.model.last_linear(y)
         if 'normalize' in self.name:
