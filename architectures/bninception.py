@@ -32,6 +32,7 @@ class Network(torch.nn.Module):
 
     def forward(self, x, warmup=False, **kwargs):
         x = self.model.features(x)
+        x = torch.nn.functional.normalize(x, dim=1)
         prepool_y = y = self.pool_base(x,kernel_size=x.shape[-1])
         if self.pool_aux is not None:
             y += self.pool_aux(x, kernel_size=x.shape[-1])
