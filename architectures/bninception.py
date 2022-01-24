@@ -60,7 +60,6 @@ class Network(torch.nn.Module):
 
         x = self.model.features(x)
         x = self.conv_reduce(x) # if unspecified in init, nn.Identity() is used
-        x = torch.nn.functional.normalize(x, dim=1)
         prepool_y = x
 
         # VQ features #########
