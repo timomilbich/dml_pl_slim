@@ -22,8 +22,8 @@ class Network(torch.nn.Module):
         self.k_e = k_e
 
         self.model = ptm.__dict__['bninception'](num_classes=1000, pretrained=pretraining)
-        self.model.last_linear = torch.nn.Linear(self.model.last_linear.in_features, embed_dim)
-
+        #self.model.last_linear = torch.nn.Linear(self.model.last_linear.in_features, embed_dim)
+        self.model.last_linear = torch.nn.Linear(self.e_dim, embed_dim)
         if self.VQ:
             if self.k_e == 1:
                 self.VectorQuantizer = VectorQuantizer(self.n_e, self.e_dim, self.beta, self.e_init)
