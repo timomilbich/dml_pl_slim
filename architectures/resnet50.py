@@ -33,14 +33,21 @@ class Network(torch.nn.Module):
                 module.eval()
                 module.train = lambda _: None
 
-        self.model.last_linear = torch.nn.Linear(self.model.last_linear.in_features, embed_dim)
+        embed_in_features_dim = self.model.last_linear.in_features
+        print(f'ARCHITECTURE:\ntype: {self.arch}\nembed_dims: {self.embed_dim}')
+        if '1x1conv' in self.arch:
+            assert self.e_dim > 0
+            print(f'1x1conv dimensionality reduction: [2048 -> {self.e_dim}]\n')
+            embed_in_features_dim = self.e_dim
+            self.conv_reduce = nn.Conv2d(in_channels=2048, out_channels=self.e_dim, kernel_size=1, stride=1, padding=0)
+        else:
+            self.conv_reduce = nn.Identity()
+
+        self.model.last_linear = torch.nn.Linear(embed_in_features_dim, embed_dim)
         self.layer_blocks = nn.ModuleList([self.model.layer1, self.model.layer2, self.model.layer3, self.model.layer4])
 
         self.pool_base = torch.nn.AdaptiveAvgPool2d(1)
         self.pool_aux  = torch.nn.AdaptiveMaxPool2d(1) if 'double' in self.arch else None
-
-        print(f'ARCHITECTURE:\ntype: {self.arch}\nembed_dims: {self.embed_dim}\n')
-
 
     def forward(self, x, warmup=False, quantize=True, **kwargs):
         # quantize argument is needed to turn off quantization for initial features
@@ -49,6 +56,8 @@ class Network(torch.nn.Module):
         x = self.model.maxpool(self.model.relu(self.model.bn1(self.model.conv1(x))))
         for k, layerblock in enumerate(self.layer_blocks):
             x = layerblock(x)
+
+        x = self.conv_reduce(x) # if unspecified in init, nn.Identity() is used
         prepool_y = x
 
         # VQ features #########

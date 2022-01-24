@@ -40,5 +40,5 @@ python main.py 'model.params.config.Architecture.params.embed_dim=512' 'lightnin
                'model.params.config.Architecture.target=architectures.resnet50.Network' 'model.params.config.Architecture.params.arch=resnet50_frozen_normalize' \
                'data.params.train.params.arch=resnet50_frozen_normalize' 'data.params.validation.params.arch=resnet50_frozen_normalize' \
                'model.params.config.Architecture.params.VQ=True' 'model.params.config.Architecture.params.n_e=2000' 'model.params.config.Architecture.params.e_dim=2048' \
-               'model.params.config.Architecture.params.e_init=feature_clustering' 'model.params.config.Architecture.params.k_e=4' \
-                --savename baseline_resnet50_vq2000_k4_ClusterInit_512_multisimilarity_cub200 --exp_path ${EXP_PATH} --gpus ${GPU_TRAINING} --base configs/multisimloss.yaml
+               'model.params.config.Architecture.params.e_init=feature_clustering' 'model.params.config.Architecture.params.k_e=64' \
+                --savename baseline_resnet50_vq2000_k64_ClusterInit_512_multisimilarity_cub200 --exp_path ${EXP_PATH} --gpus ${GPU_TRAINING} --base configs/multisimloss.yaml

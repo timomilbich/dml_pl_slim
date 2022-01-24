@@ -22,9 +22,6 @@ class Network(torch.nn.Module):
         self.k_e = k_e
 
         self.model = ptm.__dict__['bninception'](num_classes=1000, pretrained=pretraining)
-        #self.model.last_linear = torch.nn.Linear(self.model.last_linear.in_features, embed_dim)
-        self.model.last_linear = torch.nn.Linear(self.e_dim, embed_dim)
-        self.conv = nn.Conv2d(in_channels=1024, out_channels=self.e_dim, kernel_size=1, stride=1, padding=0)
 
         if self.VQ:
             if self.k_e == 1:
@@ -32,14 +29,25 @@ class Network(torch.nn.Module):
             else:
                 self.VectorQuantizer = MultiHeadVectorQuantizer(self.n_e, self.k_e, self.e_dim, self.beta, self.e_init)
 
-        if '_he' in self.arch:
-            torch.nn.init.kaiming_normal_(self.model.last_linear.weight, mode='fan_out')
-            torch.nn.init.constant_(self.model.last_linear.bias, 0)
-
         if 'frozen' in self.arch:
             for module in filter(lambda m: type(m) == nn.BatchNorm2d, self.model.modules()):
                 module.eval()
                 module.train = lambda _: None
+
+        embed_in_features_dim = self.model.last_linear.in_features
+        print(f'ARCHITECTURE:\ntype: {self.arch}\nembed_dims: {self.embed_dim}')
+        if '1x1conv' in self.arch:
+            assert self.e_dim > 0
+            print(f'1x1conv dimensionality reduction: [2048 -> {self.e_dim}]\n')
+            embed_in_features_dim = self.e_dim
+            self.conv_reduce = nn.Conv2d(in_channels=1024, out_channels=self.e_dim, kernel_size=1, stride=1, padding=0)
+        else:
+            self.conv_reduce = nn.Identity()
+
+        self.model.last_linear = torch.nn.Linear(embed_in_features_dim, embed_dim)
+        if '_he' in self.arch:
+            torch.nn.init.kaiming_normal_(embed_in_features_dim, mode='fan_out')
+            torch.nn.init.constant_(self.model.last_linear.bias, 0)
 
         self.pool_base = F.avg_pool2d
         self.pool_aux  = F.max_pool2d if 'double' in self.arch else None
@@ -51,9 +59,7 @@ class Network(torch.nn.Module):
         # extracting before clustering initialization
 
         x = self.model.features(x)
-        ###### 1*1 conv
-        x = self.conv(x)
-        ######
+        x = self.conv_reduce(x) # if unspecified in init, nn.Identity() is used
         prepool_y = x
 
         # VQ features #########
