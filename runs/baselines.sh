@@ -1,6 +1,6 @@
 export GPU_TRAINING=3 # if this is given in command line, add quotes as "2,5,6,"
 echo "GPUs: ${GPU_TRAINING}"
-export EXP_PATH='/export/home/zwu/dml_pl_slim/experiments/training_models'
+export EXP_PATH='/export/compvis-nfs/user/tmilbich/PycharmProjects/VQ-DML/experiments/training_models'
 echo "EXP_PATH: ${EXP_PATH}"
 export BETTER_EXCEPTIONS=1
 

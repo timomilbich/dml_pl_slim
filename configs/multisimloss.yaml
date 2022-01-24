@@ -18,6 +18,7 @@ model:
           e_init: 'random_uniform'
           n_e: 1000
           e_dim: 1024
+          k_e: 1
           beta: 0.25
 
       Loss:

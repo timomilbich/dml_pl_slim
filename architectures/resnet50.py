@@ -3,12 +3,12 @@ The network architectures and weights are adapted and used from the great https:
 """
 import torch, torch.nn as nn
 import pretrainedmodels as ptm
-from architectures.VQ import VectorQuantizer
+from architectures.VQ import VectorQuantizer, MultiHeadVectorQuantizer
 import argparse
 
 """============================================================="""
 class Network(torch.nn.Module):
-    def __init__(self, arch, pretraining, embed_dim, VQ, n_e=1000, beta=0.25, e_dim=1024, e_init='uniform'):
+    def __init__(self, arch, pretraining, embed_dim, VQ, n_e=1000, beta=0.25, e_dim=1024, k_e=1, e_init='random_uniform'):
         super(Network, self).__init__()
 
         self.arch = arch
@@ -19,10 +19,14 @@ class Network(torch.nn.Module):
         self.n_e = n_e
         self.beta = beta
         self.e_dim = e_dim
+        self.k_e = k_e
         self.e_init = e_init
 
         if self.VQ:
-            self.VectorQuantizer = VectorQuantizer(self.n_e, self.e_dim, self.beta, self.e_init)
+            if self.k_e == 1:
+                self.VectorQuantizer = VectorQuantizer(self.n_e, self.e_dim, self.beta, self.e_init)
+            else:
+                self.VectorQuantizer = MultiHeadVectorQuantizer(self.n_e, self.k_e, self.e_dim, self.beta, self.e_init)
 
         if 'frozen' in self.arch:
             for module in filter(lambda m: type(m) == nn.BatchNorm2d, self.model.modules()):

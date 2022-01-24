@@ -25,7 +25,7 @@ class DML_Model(pl.LightningModule):
             tmp_dataloader = instantiate_from_config(config["Optional_dataloader"]).val_dataloader()
 
             ## extract features
-            features = extract_features(self.model.cuda(), tmp_dataloader)
+            features = extract_features(self.model.cuda(), tmp_dataloader, self.model.VectorQuantizer.k_e)
 
             ## init VQ using feature clustering
             self.model.VectorQuantizer.init_codebook_by_clustering(features)

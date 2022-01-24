@@ -3,12 +3,12 @@ The network architectures and weights are adapted and used from the great https:
 """
 import torch, torch.nn as nn, torch.nn.functional as F
 import pretrainedmodels as ptm
-from architectures.VQ import VectorQuantizer
+from architectures.VQ import VectorQuantizer, MultiHeadVectorQuantizer
 
 
 """============================================================="""
 class Network(torch.nn.Module):
-    def __init__(self, arch, pretraining, embed_dim, VQ, n_e = 1000, beta = 0.25, e_dim = 1024, e_init='random_uniform'):
+    def __init__(self, arch, pretraining, embed_dim, VQ, n_e = 1000, beta = 0.25, e_dim = 1024, k_e=1, e_init='random_uniform'):
         super(Network, self).__init__()
 
         self.arch  = arch
@@ -19,11 +19,16 @@ class Network(torch.nn.Module):
         self.beta = beta
         self.e_dim = e_dim
         self.e_init = e_init
+        self.k_e = k_e
+
         self.model = ptm.__dict__['bninception'](num_classes=1000, pretrained=pretraining)
         self.model.last_linear = torch.nn.Linear(self.model.last_linear.in_features, embed_dim)
 
         if self.VQ:
-            self.VectorQuantizer = VectorQuantizer(self.n_e, self.e_dim, self.beta, self.e_init)
+            if self.k_e == 1:
+                self.VectorQuantizer = VectorQuantizer(self.n_e, self.e_dim, self.beta, self.e_init)
+            else:
+                self.VectorQuantizer = MultiHeadVectorQuantizer(self.n_e, self.k_e, self.e_dim, self.beta, self.e_init)
 
         if '_he' in self.arch:
             torch.nn.init.kaiming_normal_(self.model.last_linear.weight, mode='fan_out')

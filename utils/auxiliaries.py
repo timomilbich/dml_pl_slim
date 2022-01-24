@@ -6,7 +6,7 @@ from einops import rearrange
 from tqdm import tqdm
 import torch
 
-def extract_features(model, dataloader):
+def extract_features(model, dataloader, k_e=1):
 
     features = list()
     with torch.no_grad():
@@ -16,6 +16,10 @@ def extract_features(model, dataloader):
                 out = model(data[0].cuda(), quantize=False)
 
                 feat = rearrange(out['extra_embeds'], 'b c h w -> b h w c').contiguous()
+                if k_e > 1:
+                    e_dim_seg = int(feat.shape[-1] / k_e)
+                    feat = torch.reshape(feat, (feat.shape[0], feat.shape[1], feat.shape[2], k_e, e_dim_seg))
+
                 feat = feat.view(-1, feat.shape[-1])
                 features.append(feat)
 

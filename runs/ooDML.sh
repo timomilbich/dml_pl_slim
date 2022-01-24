@@ -1,6 +1,6 @@
 export GPU_TRAINING=0,
 echo "GPUs: ${GPU_TRAINING}"
-export EXP_PATH='/export/data/tmilbich/PycharmProjects/dml_pl/experiments/training_models'
+export EXP_PATH='/export/compvis-nfs/user/tmilbich/PycharmProjects/VQ-DML/experiments/training_models'
 echo "EXP_PATH: ${EXP_PATH}"
 export BETTER_EXCEPTIONS=1
 
