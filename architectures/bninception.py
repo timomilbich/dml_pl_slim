@@ -24,6 +24,8 @@ class Network(torch.nn.Module):
         self.model = ptm.__dict__['bninception'](num_classes=1000, pretrained=pretraining)
         #self.model.last_linear = torch.nn.Linear(self.model.last_linear.in_features, embed_dim)
         self.model.last_linear = torch.nn.Linear(self.e_dim, embed_dim)
+        self.conv = nn.Conv2d(in_channels=1024, out_channels=self.e_dim, kernel_size=1, stride=1, padding=0)
+
         if self.VQ:
             if self.k_e == 1:
                 self.VectorQuantizer = VectorQuantizer(self.n_e, self.e_dim, self.beta, self.e_init)
@@ -50,8 +52,7 @@ class Network(torch.nn.Module):
 
         x = self.model.features(x)
         ###### 1*1 conv
-        conv = nn.Conv2d(in_channels=x.shape[1], out_channels=self.e_dim, kernel_size=1, stride=1, padding=0).cuda()
-        x = conv(x)
+        x = self.conv(x)
         ######
         prepool_y = x
 
