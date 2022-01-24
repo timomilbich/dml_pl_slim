@@ -38,7 +38,7 @@ class Network(torch.nn.Module):
         print(f'ARCHITECTURE:\ntype: {self.arch}\nembed_dims: {self.embed_dim}')
         if '1x1conv' in self.arch:
             assert self.e_dim > 0
-            print(f'1x1conv dimensionality reduction: [2048 -> {self.e_dim}]\n')
+            print(f'1x1conv dimensionality reduction: [1024 -> {self.e_dim}]\n')
             embed_in_features_dim = self.e_dim
             self.conv_reduce = nn.Conv2d(in_channels=1024, out_channels=self.e_dim, kernel_size=1, stride=1, padding=0)
         else:
