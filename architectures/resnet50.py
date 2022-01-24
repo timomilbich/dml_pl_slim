@@ -33,7 +33,6 @@ class Network(torch.nn.Module):
         x = self.model.maxpool(self.model.relu(self.model.bn1(self.model.conv1(x))))
         for layerblock in self.layer_blocks:
             x = layerblock(x)
-        x = torch.nn.functional.normalize(x, dim=1)
         prepool_y = x
         if self.pool_aux is not None:
             y = self.pool_aux(x) + self.pool_base(x)
