@@ -74,14 +74,14 @@ class DATA(Dataset):
         if self.train:
             train_dataset = BaseDataset(train_image_dict, arch)
             self.dataset = train_dataset
-            print(f'DATASET:\ntype: CARS196\nSetup: Train\n#Classes: {len(train_image_dict)}')
-            print(f'ooDML Data Split [{ooDML_split_id}] with FID: [{fid:.2f}]')
+            print(f'Initializing Dataset:\n*** type: [CARS196]\n*** Setup: [Train]\n*** #Classes: [{len(train_image_dict)}]')
+            print(f'*** ooDML Data Split [{ooDML_split_id}] with FID: [{fid:.2f}]')
 
         else:
             test_dataset = BaseDataset(test_image_dict, arch, is_validation=True)
             self.dataset = test_dataset
-            print(f'DATASET:\ntype: CARS196\nSetup: Val\n#Classes: {len(test_image_dict)}')
-            print(f'ooDML Data Split [{ooDML_split_id}] with FID: [{fid:.2f}]\n')
+            print(f'Initializing Dataset:\n*** type: [CARS196]\n***Setup: [Val]\n*** #Classes: [{len(test_image_dict)}]')
+            print(f'*** ooDML Data Split [{ooDML_split_id}] with FID: [{fid:.2f}]\n')
 
 
     def __getitem__(self, idx):

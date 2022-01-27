@@ -8,7 +8,7 @@ from architectures.VQ import VectorQuantizer, MultiHeadVectorQuantizer
 
 """============================================================="""
 class Network(torch.nn.Module):
-    def __init__(self, arch, pretraining, embed_dim, VQ, n_e = 1000, beta = 0.25, e_dim = 1024, k_e=1, e_init='random_uniform', block_to_quantize=-1):
+    def __init__(self, arch, pretraining, embed_dim, VQ, n_e = 1000, beta = 0.25, e_dim = 1024, k_e=1, e_init='random_uniform', **kwargs):
         super(Network, self).__init__()
 
         self.arch  = arch
@@ -20,23 +20,24 @@ class Network(torch.nn.Module):
         self.e_dim = e_dim
         self.e_init = e_init
         self.k_e = k_e
-        self.block_to_quantize = block_to_quantize
-
         self.model = ptm.__dict__['bninception'](num_classes=1000, pretrained=pretraining)
 
+        # Add Vector Quantization (Optionally)
         if self.VQ:
             if self.k_e == 1:
                 self.VectorQuantizer = VectorQuantizer(self.n_e, self.e_dim, self.beta, self.e_init)
             else:
                 self.VectorQuantizer = MultiHeadVectorQuantizer(self.n_e, self.k_e, self.e_dim, self.beta, self.e_init)
 
+        # Freeze all BatchNorm layers (Optionally)
         if 'frozen' in self.arch:
             for module in filter(lambda m: type(m) == nn.BatchNorm2d, self.model.modules()):
                 module.eval()
                 module.train = lambda _: None
 
+        # Downsample final feature map (channel dim., Optionally)
         embed_in_features_dim = self.model.last_linear.in_features
-        print(f'Architecture: [{self.arch}]\n*** embed_dims = [{self.embed_dim}]')
+        print(f'Initializing Architecture: [{self.arch}]\n*** embed_dims = [{self.embed_dim}]')
         if '1x1conv' in self.arch:
             assert self.e_dim > 0
             print(f'*** 1x1conv dimensionality reduction: [1024 -> {self.e_dim}]\n')
@@ -45,11 +46,13 @@ class Network(torch.nn.Module):
         else:
             self.conv_reduce = nn.Identity()
 
+        # Add embedding layer
         self.model.last_linear = torch.nn.Linear(embed_in_features_dim, embed_dim)
         if '_he' in self.arch:
             torch.nn.init.kaiming_normal_(embed_in_features_dim, mode='fan_out')
             torch.nn.init.constant_(self.model.last_linear.bias, 0)
 
+        # Select pooling strategy
         self.pool_base = F.avg_pool2d
         self.pool_aux  = F.max_pool2d if 'double' in self.arch else None
 
@@ -64,11 +67,12 @@ class Network(torch.nn.Module):
         # VQ features #########
         if self.VQ:
             if quantize:
-                x, vq_loss, perplexity, cluster_use = self.VectorQuantizer(x)
+                x, vq_loss, perplexity, cluster_use, vq_indices = self.VectorQuantizer(x)
             else:
                 vq_loss = 0
                 perplexity = 0
                 cluster_use = 0
+                vq_indices = 0
         ##########
 
         y = self.pool_base(x,kernel_size=x.shape[-1])
@@ -88,6 +92,6 @@ class Network(torch.nn.Module):
         if 'normalize' in self.name:
             z = F.normalize(z, dim=-1)
         if self.VQ:
-            return {'embeds': z, 'avg_features': y, 'features': x, 'extra_embeds': prepool_y, 'vq_loss': vq_loss, 'vq_perplexity': perplexity, 'vq_cluster_use': cluster_use}
+            return {'embeds': z, 'avg_features': y, 'features': x, 'extra_embeds': prepool_y, 'vq_loss': vq_loss, 'vq_perplexity': perplexity, 'vq_cluster_use': cluster_use, 'vq_indices': vq_indices}
         else:
             return {'embeds': z, 'avg_features': y, 'features': x, 'extra_embeds': prepool_y}

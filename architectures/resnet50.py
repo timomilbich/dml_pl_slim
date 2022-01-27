@@ -52,7 +52,7 @@ class Network(torch.nn.Module):
 
         # Downsample final feature map (channel dim., Optionally)
         embed_in_features_dim = self.model.last_linear.in_features
-        print(f'Architecture: [{self.arch}]\n*** embed_dims = [{self.embed_dim}]')
+        print(f'Initializing Architecture: [{self.arch}]\n*** embed_dims = [{self.embed_dim}]')
         if '1x1conv' in self.arch:
             assert self.e_dim > 0
             print(f'*** 1x1conv dimensionality reduction: [2048 -> {self.e_dim}]\n')

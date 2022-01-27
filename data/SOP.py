@@ -84,12 +84,15 @@ class DATA(Dataset):
             train_dataset = BaseDataset(train_image_dict, arch)
             train_dataset.conversion = train_conversion
             self.dataset = train_dataset
-            print(f'DATASET:\ntype: SOP\nSetup: Train\n#Classes: {len(train_image_dict)}')
+            print(f'Initializing Dataset:\n*** type: [SOP]\n ***Setup: [Train]\n*** #Classes: [{len(train_image_dict)}]')
+            print(f'*** ooDML Data Split [{ooDML_split_id}] with FID: [{fid:.2f}]')
         else:
             test_dataset = BaseDataset(test_image_dict, arch, is_validation=True)
             test_dataset.conversion = test_conversion
             self.dataset = test_dataset
-            print(f'DATASET:\ntype: SOP\nSetup: Val\n#Classes: {len(test_image_dict)}\n')
+            print(f'Initializing Dataset:\n*** type: [SOP]\n*** Setup: [Val]\n*** #Classes: [{len(test_image_dict)}]\n')
+            print(f'*** ooDML Data Split [{ooDML_split_id}] with FID: [{fid:.2f}]')
+
 
     def __getitem__(self, idx):
         return self.dataset.__getitem__(idx)
