@@ -257,8 +257,8 @@ if __name__ == "__main__":
         model.tau = tau
         bs, base_lr = config.data.params.batch_size, config.model.base_learning_rate
         model.learning_rate = base_lr
-        print(f"TRAINING PARAMETERS:\nmax_epoch: {trainer_opt.max_epochs}\noptimizer: {model.type_optim}\nbatchsize: {data.batch_size}\nlearning rate: {model.learning_rate}"
-              f"\nweight_decay: {weight_decay}\nscheduler: {scheduler}\ngamma: {gamma}\ntau: {tau}\n")
+        print(f"Training parameters:\n*** max_epoch = [{trainer_opt.max_epochs}]\n*** optimizer = [{model.type_optim}]\n*** batchsize = [{data.batch_size}]\n*** learning rate = [{model.learning_rate}]"
+              f"\n*** weight_decay = [{weight_decay}]\n*** scheduler = [{scheduler}]\n*** gamma = [{gamma}]\n*** tau = [{tau}]\n")
 
 
         # run

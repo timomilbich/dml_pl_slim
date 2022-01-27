@@ -8,7 +8,7 @@ from architectures.VQ import VectorQuantizer, MultiHeadVectorQuantizer
 
 """============================================================="""
 class Network(torch.nn.Module):
-    def __init__(self, arch, pretraining, embed_dim, VQ, n_e = 1000, beta = 0.25, e_dim = 1024, k_e=1, e_init='random_uniform'):
+    def __init__(self, arch, pretraining, embed_dim, VQ, n_e = 1000, beta = 0.25, e_dim = 1024, k_e=1, e_init='random_uniform', block_to_quantize=-1):
         super(Network, self).__init__()
 
         self.arch  = arch
@@ -20,6 +20,7 @@ class Network(torch.nn.Module):
         self.e_dim = e_dim
         self.e_init = e_init
         self.k_e = k_e
+        self.block_to_quantize = block_to_quantize
 
         self.model = ptm.__dict__['bninception'](num_classes=1000, pretrained=pretraining)
 
@@ -35,10 +36,10 @@ class Network(torch.nn.Module):
                 module.train = lambda _: None
 
         embed_in_features_dim = self.model.last_linear.in_features
-        print(f'ARCHITECTURE:\ntype: {self.arch}\nembed_dims: {self.embed_dim}')
+        print(f'Architecture: [{self.arch}]\n*** embed_dims = [{self.embed_dim}]')
         if '1x1conv' in self.arch:
             assert self.e_dim > 0
-            print(f'1x1conv dimensionality reduction: [1024 -> {self.e_dim}]\n')
+            print(f'*** 1x1conv dimensionality reduction: [1024 -> {self.e_dim}]\n')
             embed_in_features_dim = self.e_dim
             self.conv_reduce = nn.Conv2d(in_channels=1024, out_channels=self.e_dim, kernel_size=1, stride=1, padding=0)
         else:
@@ -51,8 +52,6 @@ class Network(torch.nn.Module):
 
         self.pool_base = F.avg_pool2d
         self.pool_aux  = F.max_pool2d if 'double' in self.arch else None
-
-        print(f'ARCHITECTURE:\ntype: {self.arch}\nembed_dims: {self.embed_dim}\n')
 
     def forward(self, x, warmup=False, quantize=True, **kwargs):
         # quantize argument is needed to turn off quantization for initial features

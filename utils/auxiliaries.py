@@ -8,6 +8,9 @@ import torch
 
 def extract_features(model, dataloader, k_e=1):
 
+    # max_num_features = 20000000
+    max_num_features = 200000
+
     features = list()
     with torch.no_grad():
         with tqdm(dataloader, desc ="Extracting features...") as tqdm_loader:
@@ -21,6 +24,11 @@ def extract_features(model, dataloader, k_e=1):
                     feat = torch.reshape(feat, (feat.shape[0], feat.shape[1], feat.shape[2], k_e, e_dim_seg))
 
                 feat = feat.view(-1, feat.shape[-1])
+
+                # avoid memory overflow
+                if i * feat.shape[0] > max_num_features:
+                    break
+
                 features.append(feat)
 
             return torch.cat([feat for feat in features]).cpu().detach().numpy()

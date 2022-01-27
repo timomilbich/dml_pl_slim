@@ -1,5 +1,6 @@
 import numpy as np
-import torch
+from itertools import chain
+import torch, wandb
 import pytorch_lightning as pl
 from omegaconf import OmegaConf
 from utils.auxiliaries import instantiate_from_config, extract_features
@@ -99,6 +100,10 @@ class DML_Model(pl.LightningModule):
             self.log("vq_cl_use", vq_clust_use, prog_bar=True, logger=False, on_step=False, on_epoch=True)
             out_dict['vq_cluster_use'] = vq_clust_use
 
+        if 'vq_indices' in output.keys():
+            vq_indices = output['vq_indices'].cpu().detach().numpy()
+            out_dict['vq_indices'] = vq_indices
+
         return out_dict
 
     def training_epoch_end(self, outputs):
@@ -114,6 +119,14 @@ class DML_Model(pl.LightningModule):
         if 'vq_cluster_use' in outputs[0].keys():
             vq_cluster_use_avs = np.mean([x["vq_cluster_use"] for x in outputs])
             log_data = {**log_data, f"vq_cluster_use": vq_cluster_use_avs}
+
+        if 'vq_indices' in outputs[0].keys():
+            vq_indices = [x["vq_indices"].tolist() for x in outputs]
+            vq_indices = list(chain.from_iterable(vq_indices))
+            data = [[i, vq_indices.count(i)] for i in range(self.model.n_e)]
+            table = wandb.Table(data=data, columns=["codeword", "frequency"])
+            # wandb.log({'histogram-codebook_usage': wandb.plot.histogram(table, "codeword")})
+            wandb.log({"freq_per_codeword": wandb.plot.line(table, "codeword", "frequency", title="codeword frequency")})
 
         if self.loss.REQUIRES_LOGGING:
             loss_log_data = self.loss.get_log_data()

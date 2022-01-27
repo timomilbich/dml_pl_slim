@@ -12,15 +12,13 @@ model:
         target: architectures.resnet50.Network
         params:
           pretraining: "imagenet"
-          embed_dim: 128
-          arch: "resnet50_frozen_normalize" # deit_small_patch16_224, resnet50_frozen_normalize
-          VQ: False
-
-      Vectorquantizer:
-        target: architectures.VQ.VectorQuantizer
-        params:
-          n_e: 8196
+          embed_dim: -1 # 512
+          arch: "resnet50_frozen_normalize" #"bninception_frozen_normalize", vit_small_patch16_224_normalize
+          VQ: True
+          e_init: 'random_uniform'
+          n_e: 1000
           e_dim: 1024
+          k_e: 1
           beta: 0.25
 
       Loss:
@@ -55,6 +53,20 @@ model:
       CustomLogs:
         target: models.log.custom_logging
 
+      Optional_dataloader: # required for VQ-'feature_clustering' initialization
+        target: data.base.DataModuleFromConfig
+        params:
+          batch_size: 112
+          num_workers: 20
+
+          validation:
+            target: data.CUB200.DATA
+            params:
+              root:
+              train: True
+              ooDML_split_id: -1
+              arch: "resnet50_frozen_normalize" # vit_small_patch16_224_normalize
+
 data:
   target: data.base.DataModuleFromConfig
   params:
@@ -66,6 +78,7 @@ data:
       params: 
         root:
         train: True
+        ooDML_split_id: -1
         arch: "resnet50_frozen_normalize" # resnet50_frozen_normalize
       data_sampler:
         target: datasampler.select
@@ -78,6 +91,7 @@ data:
       params:
         root:
         train: False
+        ooDML_split_id: -1
         arch: "resnet50_frozen_normalize" # resnet50_frozen_normalize
 
 lightning:
@@ -87,21 +101,21 @@ lightning:
     # accumulate_grad_batches: 1
     auto_scale_batch_size: false
     benchmark: False
-    deterministic: True
+    deterministic: False
     amp_backend: 'native'
     #amp_level: '02'
     log_every_n_steps: 25
     check_val_every_n_epoch: 1
     max_epochs: 100
-    num_sanity_val_steps: -1
+    num_sanity_val_steps: 0
 
   logger:
     target: pytorch_lightning.loggers.WandbLogger
     params:
       wandb_key: d84d1363e77cf0020a24401aaac1ad22ed7b3388
-      project: DML
-      group: baselines
-      savename: test
+      project: VQ-DML
+      group:
+      savename:
 
   modelcheckpoint:
     target: pytorch_lightning.callbacks.ModelCheckpoint

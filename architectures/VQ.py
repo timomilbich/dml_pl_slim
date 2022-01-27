@@ -22,7 +22,7 @@ class VectorQuantizer(nn.Module):
     # NOTE: due to a bug the beta term was applied to the wrong term. for
     # backwards compatibility we use the buggy version by default, but you can
     # specify legacy=False to fix it.
-    def __init__(self, n_e, e_dim, beta, e_init='random_uniform', remap=None, unknown_index="random",
+    def __init__(self, n_e, e_dim, beta, e_init='random_uniform', block_to_quantize=-1, remap=None, unknown_index="random",
                  sane_index_shape=False, legacy=True):
         super().__init__()
         self.n_e = n_e
@@ -30,6 +30,7 @@ class VectorQuantizer(nn.Module):
         self.beta = beta
         self.legacy = legacy
         self.e_init = e_init
+        self.block_to_quantize = block_to_quantize
 
         self.embedding = nn.Embedding(self.n_e, self.e_dim)
         if self.e_init == 'random_uniform':
@@ -49,6 +50,13 @@ class VectorQuantizer(nn.Module):
             self.re_embed = n_e
 
         self.sane_index_shape = sane_index_shape
+
+        print(f'Initializeing VQ [VectorQuantization]')
+        print(f'*** n_e = [{self.n_e}]')
+        print(f'*** e_dim = [{self.e_dim}]')
+        print(f'*** e_init = [{self.e_init}]')
+        print(f'*** block_to_quantize = [{self.block_to_quantize}]')
+        print(f'*** beta = [{self.beta}]\n')
 
     def remap_to_used(self, inds):
         ishape = inds.shape
@@ -186,7 +194,7 @@ class MultiHeadVectorQuantizer(nn.Module):
     # NOTE: due to a bug the beta term was applied to the wrong term. for
     # backwards compatibility we use the buggy version by default, but you can
     # specify legacy=False to fix it.
-    def __init__(self, n_e, k_e, e_dim, beta, e_init='random_uniform', remap=None, unknown_index="random",
+    def __init__(self, n_e, k_e, e_dim, beta, e_init='random_uniform', block_to_quantize=-1, remap=None, unknown_index="random",
                  sane_index_shape=False, legacy=True):
         super().__init__()
         self.n_e = n_e
@@ -200,6 +208,7 @@ class MultiHeadVectorQuantizer(nn.Module):
         self.beta = beta
         self.legacy = legacy
         self.e_init = e_init
+        self.block_to_quantize = block_to_quantize
 
         self.embedding = nn.Embedding(self.n_e, self.e_dim_seg)
         if self.e_init == 'random_uniform':
@@ -219,6 +228,15 @@ class MultiHeadVectorQuantizer(nn.Module):
             self.re_embed = n_e
 
         self.sane_index_shape = sane_index_shape
+
+        print(f'Initializeing VQ [MultiHeadVectorQuantization]')
+        print(f'*** n_e = [{self.n_e}]')
+        print(f'*** e_dim = [{self.e_dim}]')
+        print(f'*** k_e = [{self.k_e}]')
+        print(f'*** e_dim_seg = [{self.e_dim_seg}]')
+        print(f'*** e_init = [{self.e_init}]')
+        print(f'*** block_to_quantize = [{self.block_to_quantize}]')
+        print(f'*** beta = [{self.beta}]\n')
 
     def remap_to_used(self, inds):
         ishape = inds.shape
@@ -244,6 +262,7 @@ class MultiHeadVectorQuantizer(nn.Module):
         back = torch.gather(used[None, :][inds.shape[0] * [0], :], 1, inds)
         return back.reshape(ishape)
 
+
     def forward(self, z, temp=None, rescale_logits=False, return_logits=False):
         assert temp is None or temp == 1.0, "Only for interface compatible with Gumbel"
         assert rescale_logits == False, "Only for interface compatible with Gumbel"
@@ -251,8 +270,6 @@ class MultiHeadVectorQuantizer(nn.Module):
 
         # reshape z -> (batch, height, width, channel) and flatten
         z = rearrange(z, 'b c h w -> b h w c').contiguous()
-
-        #todo: split features into multiple equally spaced segments (torch.split or torch.reshape?)
         z_tmp = torch.reshape(z, (z.shape[0], z.shape[1], z.shape[2], self.k_e, self.e_dim_seg))
         z_tmp = z_tmp.view(-1, self.e_dim_seg)
         # distances from z to embeddings e_j (z - e)^2 = z^2 + e^2 - 2 e * z
@@ -275,11 +292,7 @@ class MultiHeadVectorQuantizer(nn.Module):
 
         # preserve gradients
         z_q = z + (z_q - z).detach()
-
-        #todo: reshape back to match original input shape
         z_q = rearrange(z_q, 'b h w c -> b c h w').contiguous()
-
-        #todo: adjust feauture clustering intialization
 
         if self.remap is not None:
             min_encoding_indices = min_encoding_indices.reshape(z.shape[0], -1)  # add batch axis
@@ -291,9 +304,7 @@ class MultiHeadVectorQuantizer(nn.Module):
 
         perplexity, cluster_use = self.measure_perplexity(min_encoding_indices, self.n_e)
 
-        return z_q, loss, perplexity, cluster_use
-
-    # return z_q, loss, (perplexity, min_encodings, min_encoding_indices)
+        return z_q, loss, perplexity, cluster_use, min_encoding_indices
 
     def get_codebook_entry(self, indices, shape):
         # shape specifying (batch, height, width, channel)
