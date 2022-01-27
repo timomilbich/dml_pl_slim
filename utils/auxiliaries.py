@@ -9,7 +9,7 @@ import torch
 def extract_features(model, dataloader, k_e=1):
 
     # max_num_features = 20000000
-    max_num_features = 200000
+    max_num_features = 20000000
 
     features = list()
     with torch.no_grad():

@@ -20,7 +20,7 @@ model:
           e_dim: 1024
           k_e: 1
           beta: 0.25
-          block_to_quantize: 4
+          block_to_quantize: 4 # currently only applicable for ResNet50 backbone
 
       Loss:
         target: criteria.select
