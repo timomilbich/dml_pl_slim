@@ -34,6 +34,8 @@ class Network(torch.nn.Module):
         if self.block_to_quantize < MAX_BLOCK_TO_QUANTIZE:
             assert '1x1conv' not in self.arch, "Expected dimesionality of intermediate features must be kept."
             self.e_dim = NUM_FEAT_PER_BLOCK[self.block_to_quantize]
+        else:
+            raise Exception('Attempting to quantize non-existent resnet block [Max. number is 4.]!')
 
         # Add Vector Quantization (Optionally)
         if self.VQ:
