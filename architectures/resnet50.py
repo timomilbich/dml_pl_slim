@@ -61,6 +61,7 @@ class Network(torch.nn.Module):
             embed_in_features_dim = self.e_dim
             self.conv_reduce = nn.Conv2d(in_channels=2048, out_channels=self.e_dim, kernel_size=1, stride=1, padding=0)
         else:
+            print(f'\n')
             self.conv_reduce = nn.Identity()
 
         # Add embedding layer

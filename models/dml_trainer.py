@@ -120,13 +120,13 @@ class DML_Model(pl.LightningModule):
             vq_cluster_use_avs = np.mean([x["vq_cluster_use"] for x in outputs])
             log_data = {**log_data, f"vq_cluster_use": vq_cluster_use_avs}
 
-        if 'vq_indices' in outputs[0].keys():
-            vq_indices = [x["vq_indices"].tolist() for x in outputs]
-            vq_indices = list(chain.from_iterable(vq_indices))
-            data = [[i, vq_indices.count(i)] for i in range(self.model.n_e)]
-            table = wandb.Table(data=data, columns=["codeword", "frequency"])
-            # wandb.log({'histogram-codebook_usage': wandb.plot.histogram(table, "codeword")})
-            wandb.log({"freq_per_codeword": wandb.plot.line(table, "codeword", "frequency", title="codeword frequency")})
+        # if 'vq_indices' in outputs[0].keys():
+            # vq_indices = [x["vq_indices"].tolist() for x in outputs]
+            # vq_indices = list(chain.from_iterable(vq_indices))
+            # data = [[i, vq_indices.count(i)] for i in range(self.model.n_e)]
+            # table = wandb.Table(data=data, columns=["codeword", "frequency"])
+            # # wandb.log({'histogram-codebook_usage': wandb.plot.histogram(table, "codeword")})
+            # wandb.log({"freq_per_codeword": wandb.plot.line(table, "codeword", "frequency", title="codeword frequency")})
 
         if self.loss.REQUIRES_LOGGING:
             loss_log_data = self.loss.get_log_data()
