@@ -249,7 +249,8 @@ if __name__ == "__main__":
             trainer_kwargs["callbacks"] += [checkpoint_callback]
 
         ## Define Trainer
-        trainer = Trainer.from_argparse_args(trainer_opt, **trainer_kwargs, strategy=DDPPlugin(find_unused_parameters=False))
+        gpu_strategy = DDPPlugin(find_unused_parameters=False) if len(trainer_config['gpus'])>1 else None
+        trainer = Trainer.from_argparse_args(trainer_opt, **trainer_kwargs, strategy=gpu_strategy)
         weight_decay, gamma, scheduler, tau, type_optim = config.model.weight_decay, config.model.gamma, config.model.scheduler, config.model.tau, config.model.type_optim
         model.type_optim = type_optim
         model.weight_decay = weight_decay
