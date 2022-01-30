@@ -140,15 +140,15 @@ class DML_Model(pl.LightningModule):
 
         with torch.no_grad():
             out = self.model(inputs)
-            embeds = out['embeds']  # {'embeds': z, 'avg_features': y, 'features': x, 'extra_embeds': prepool_y}
-            features = out['features']
-
+            embeds = out['embeds'].cpu().detach()  
+            features = out['features'].cpu().detach()
+            # {'embeds': z, 'avg_features': y, 'features': x, 'extra_embeds': prepool_y}
 
         return {"embeds": embeds, "labels": labels, "features": features}
 
     def validation_epoch_end(self, outputs):
-        embeds = torch.cat([x["embeds"] for x in outputs]).cpu().detach()
-        labels = torch.cat([x["labels"] for x in outputs]).cpu().detach()
+        embeds = torch.cat([x["embeds"] for x in outputs])
+        labels = torch.cat([x["labels"] for x in outputs])
 
         # perform validation
         computed_metrics = self.metric_computer.compute_standard(embeds, labels, self.device)
