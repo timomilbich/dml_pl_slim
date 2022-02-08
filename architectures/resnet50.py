@@ -40,9 +40,9 @@ class Network(torch.nn.Module):
 
         # Add Vector Quantization (Optionally)
         if 'VQ_factorized' in self.VQ:
-            self.VectorQuantizer = FactorizedVectorQuantizer(self.n_e, self.e_dim, self.e_dim_latent, self.beta, self.e_init, self.block_to_quantize)
+            self.VectorQuantizer = FactorizedVectorQuantizer(self.VQ, self.n_e, self.e_dim, self.e_dim_latent, self.beta, self.e_init, self.block_to_quantize)
         elif 'VQ_vanilla' in self.VQ:
-                self.VectorQuantizer = VectorQuantizer(self.n_e, self.e_dim, self.beta, self.e_init, self.block_to_quantize)
+                self.VectorQuantizer = VectorQuantizer(self.VQ, self.n_e, self.e_dim, self.beta, self.e_init, self.block_to_quantize)
         elif 'VQ_multihead' in self.VQ:
             self.VectorQuantizer = MultiHeadVectorQuantizer(self.VQ, self.n_e, self.k_e, self.e_dim, self.beta, self.e_init, self.block_to_quantize)
         else:
