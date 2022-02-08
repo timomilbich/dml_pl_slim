@@ -172,6 +172,7 @@ class MultiHeadVectorQuantizer(nn.Module):
 
         all_z_sub_q = []
         losses = []
+        all_min_encoding_indices = []
         for k, z_sub in enumerate(z):
 
             z_sub = z_sub.view(-1, self.e_dim_seg)
@@ -187,6 +188,7 @@ class MultiHeadVectorQuantizer(nn.Module):
             z_sub = z_sub.view(z_shape[0], z_shape[1], z_shape[2], -1)
 
             all_z_sub_q.append(z_sub_q)
+            all_min_encoding_indices.append(min_encoding_indices)
 
             # compute loss for embedding
             if not self.legacy:
@@ -200,6 +202,7 @@ class MultiHeadVectorQuantizer(nn.Module):
         z_q = torch.cat(all_z_sub_q, dim=-1)
         z = torch.cat(z, dim=-1)
         loss = torch.stack(losses).mean()
+        min_encoding_indices = torch.cat(all_min_encoding_indices)
 
         # preserve gradients
         z_q = z + (z_q - z).detach()
