@@ -3,12 +3,12 @@ The network architectures and weights are adapted and used from the great https:
 """
 import torch, torch.nn as nn, torch.nn.functional as F
 import pretrainedmodels as ptm
-from architectures.VQ import VectorQuantizer, MultiHeadVectorQuantizer
+from architectures.VQ import VectorQuantizer, MultiHeadVectorQuantizer, FactorizedVectorQuantizer
 
 
 """============================================================="""
 class Network(torch.nn.Module):
-    def __init__(self, arch, pretraining, embed_dim, VQ, n_e = 1000, beta = 0.25, e_dim = 1024, k_e=1, e_init='random_uniform', **kwargs):
+    def __init__(self, arch, pretraining, embed_dim, VQ, n_e = 1000, beta = 0.25, e_dim = 1024, k_e=1, e_init='random_uniform', e_dim_latent=32, **kwargs):
         super(Network, self).__init__()
 
         self.arch  = arch
@@ -18,22 +18,28 @@ class Network(torch.nn.Module):
         self.n_e = n_e
         self.beta = beta
         self.e_dim = e_dim
+        self.e_dim_latent = e_dim_latent
         self.e_init = e_init
         self.k_e = k_e
         self.model = ptm.__dict__['bninception'](num_classes=1000, pretrained=pretraining)
 
         # Add Vector Quantization (Optionally)
-        if self.VQ:
-            if self.k_e == 1:
+        if 'VQ_factorized' in self.VQ:
+            self.VectorQuantizer = FactorizedVectorQuantizer(self.n_e, self.e_dim, self.e_dim_latent, self.beta, self.e_init)
+        elif 'VQ_vanilla' in self.VQ:
                 self.VectorQuantizer = VectorQuantizer(self.n_e, self.e_dim, self.beta, self.e_init)
-            else:
-                self.VectorQuantizer = MultiHeadVectorQuantizer(self.n_e, self.k_e, self.e_dim, self.beta, self.e_init)
+        elif 'VQ_multihead' in self.VQ:
+            self.VectorQuantizer = MultiHeadVectorQuantizer(self.VQ, self.n_e, self.k_e, self.e_dim, self.beta, self.e_init)
+        else:
+            self.VQ = False
 
-        # Freeze all BatchNorm layers (Optionally)
-        if 'frozen' in self.arch:
-            for module in filter(lambda m: type(m) == nn.BatchNorm2d, self.model.modules()):
-                module.eval()
-                module.train = lambda _: None
+        # Freeze all/part of the BatchNorm layers (Optionally)
+        if 'frozenAll' in self.arch:
+            self.freeze_all_batchnorm()
+        elif 'frozenPart' in self.arch:
+            self.freeze_and_remove_batchnorm()
+        elif 'frozen' in self.arch:
+            self.freeze_all_batchnorm()
 
         # Downsample final feature map (channel dim., Optionally)
         embed_in_features_dim = self.model.last_linear.in_features
@@ -95,3 +101,24 @@ class Network(torch.nn.Module):
             return {'embeds': z, 'avg_features': y, 'features': x, 'extra_embeds': prepool_y, 'vq_loss': vq_loss, 'vq_perplexity': perplexity, 'vq_cluster_use': cluster_use, 'vq_indices': vq_indices}
         else:
             return {'embeds': z, 'avg_features': y, 'features': x, 'extra_embeds': prepool_y}
+
+    def freeze_and_remove_batchnorm(self):
+        layers_to_remove = ['inception_5']
+
+        for name, layer in self.model.named_modules():
+            if isinstance(layer, nn.BatchNorm2d):
+                if any(x in name for x in layers_to_remove): # remove final layer bn, since it is going to be quantized. Pretrained BN params may be off otherwise.
+                    layer.reset_parameters()
+                    layer.eval()
+                    layer.train = lambda _: None
+                    with torch.no_grad():
+                        layer.weight.fill_(1.0)
+                        layer.bias.zero_()
+                else: # freeze BN layers
+                    layer.eval()
+                    layer.train = lambda _: None
+
+    def freeze_all_batchnorm(self):
+        for module in filter(lambda m: type(m) == nn.BatchNorm2d, self.model.modules()):
+            module.eval()
+            module.train = lambda _: None

@@ -249,16 +249,17 @@ if __name__ == "__main__":
             trainer_kwargs["callbacks"] += [checkpoint_callback]
 
         ## Define Trainer
-        trainer = Trainer.from_argparse_args(trainer_opt, **trainer_kwargs, strategy=DDPPlugin(find_unused_parameters=False))
-        weight_decay, gamma, scheduler, tau, type_optim = config.model.weight_decay, config.model.gamma, config.model.scheduler, config.model.tau, config.model.type_optim
+        trainer = Trainer.from_argparse_args(trainer_opt, **trainer_kwargs)
+        weight_decay, gamma, scheduler, tau, type_optim, warmup_iterations = config.model.weight_decay, config.model.gamma, config.model.scheduler, config.model.tau, config.model.type_optim, config.model.warmup_iterations
         model.type_optim = type_optim
         model.weight_decay = weight_decay
         model.gamma = gamma
         model.tau = tau
+        model.warmup_iterations = warmup_iterations
         bs, base_lr = config.data.params.batch_size, config.model.base_learning_rate
         model.learning_rate = base_lr
         print(f"Training parameters:\n*** max_epoch = [{trainer_opt.max_epochs}]\n*** optimizer = [{model.type_optim}]\n*** batchsize = [{data.batch_size}]\n*** learning rate = [{model.learning_rate}]"
-              f"\n*** weight_decay = [{weight_decay}]\n*** scheduler = [{scheduler}]\n*** gamma = [{gamma}]\n*** tau = [{tau}]\n")
+              f"\n*** weight_decay = [{weight_decay}]\n*** scheduler = [{scheduler}]\n*** gamma = [{gamma}]\n*** tau = [{tau}]\n*** warmup_iterations=[{model.warmup_iterations}]\n]")
 
 
         # run

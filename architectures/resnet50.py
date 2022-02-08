@@ -3,7 +3,7 @@ The network architectures and weights are adapted and used from the great https:
 """
 import torch, torch.nn as nn
 import pretrainedmodels as ptm
-from architectures.VQ import VectorQuantizer, MultiHeadVectorQuantizer
+from architectures.VQ import VectorQuantizer, MultiHeadVectorQuantizer, FactorizedVectorQuantizer
 import argparse
 
 """============================================================="""
@@ -30,6 +30,7 @@ class Network(torch.nn.Module):
         self.e_dim = e_dim
         self.k_e = k_e
         self.e_init = e_init
+
         self.block_to_quantize = block_to_quantize
         if self.block_to_quantize < MAX_BLOCK_TO_QUANTIZE:
             assert '1x1conv' not in self.arch, "Expected dimesionality of intermediate features must be kept."
@@ -38,17 +39,22 @@ class Network(torch.nn.Module):
             raise Exception('Attempting to quantize non-existent resnet block [Max. number is 4.]!')
 
         # Add Vector Quantization (Optionally)
-        if self.VQ:
-            if self.k_e == 1:
+        if 'VQ_factorized' in self.VQ:
+            self.VectorQuantizer = FactorizedVectorQuantizer(self.n_e, self.e_dim, self.e_dim_latent, self.beta, self.e_init, self.block_to_quantize)
+        elif 'VQ_vanilla' in self.VQ:
                 self.VectorQuantizer = VectorQuantizer(self.n_e, self.e_dim, self.beta, self.e_init, self.block_to_quantize)
-            else:
-                self.VectorQuantizer = MultiHeadVectorQuantizer(self.n_e, self.k_e, self.e_dim, self.beta, self.e_init, self.block_to_quantize)
+        elif 'VQ_multihead' in self.VQ:
+            self.VectorQuantizer = MultiHeadVectorQuantizer(self.VQ, self.n_e, self.k_e, self.e_dim, self.beta, self.e_init, self.block_to_quantize)
+        else:
+            self.VQ = False
 
         # Freeze all/part of the BatchNorm layers (Optionally)
         if 'frozenAll' in self.arch:
             self.freeze_all_batchnorm()
         elif 'frozenPart' in self.arch:
             self.freeze_and_remove_batchnorm()
+        elif 'frozen_bn2ln' in self.arch:
+            self.freeze_and_bn_to_ln()
         elif 'frozen' in self.arch:
             self.freeze_all_batchnorm()
 
@@ -135,3 +141,16 @@ class Network(torch.nn.Module):
             module.eval()
             module.train = lambda _: None
 
+    def freeze_and_bn_to_ln(self):
+        layers_to_remove = ['layer4.2', 'layer4.1']
+        H = W = 7
+
+        for name, layer in self.model.named_modules():
+            if isinstance(layer, nn.BatchNorm2d):
+                if any(x in name for x in layers_to_remove): # remove final layer bn, since it is going to be quantized. Pretrained BN params may be off otherwise.
+                    name_split = name.split('.')
+                    self.model._modules[name_split[0]][int(name_split[1])]._modules[name_split[2]] = nn.LayerNorm([layer.num_features, H, W])
+
+                else: # freeze BN layers
+                    layer.eval()
+                    layer.train = lambda _: None

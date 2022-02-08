@@ -8,7 +8,6 @@ import torch
 
 def extract_features(model, dataloader, k_e=1):
 
-    # max_num_features = 20000000
     max_num_features = 20000000
 
     features = list()
@@ -31,7 +30,10 @@ def extract_features(model, dataloader, k_e=1):
 
                 features.append(feat)
 
-            return torch.cat([feat for feat in features]).cpu().detach().numpy()
+            features = torch.cat([feat for feat in features]).cpu().detach().numpy()
+            torch.cuda.empty_cache()
+
+            return features
 
 
 #############################################

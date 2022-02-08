@@ -36,51 +36,12 @@ class VectorQuantizer(nn.Module):
         if self.e_init == 'random_uniform':
             self.embedding.weight.data.uniform_(-100.0 / self.n_e, 100.0 / self.n_e)
 
-        self.remap = remap
-        if self.remap is not None:
-            self.register_buffer("used", torch.tensor(np.load(self.remap)))
-            self.re_embed = self.used.shape[0]
-            self.unknown_index = unknown_index  # "random" or "extra" or integer
-            if self.unknown_index == "extra":
-                self.unknown_index = self.re_embed
-                self.re_embed = self.re_embed + 1
-            print(f"Remapping {self.n_e} indices to {self.re_embed} indices. "
-                  f"Using {self.unknown_index} for unknown indices.")
-        else:
-            self.re_embed = n_e
-
-        self.sane_index_shape = sane_index_shape
-
         print(f'Initializeing VQ [VectorQuantization]')
         print(f'*** n_e = [{self.n_e}]')
         print(f'*** e_dim = [{self.e_dim}]')
         print(f'*** e_init = [{self.e_init}]')
         print(f'*** block_to_quantize = [{self.block_to_quantize}]')
         print(f'*** beta = [{self.beta}]\n')
-
-    def remap_to_used(self, inds):
-        ishape = inds.shape
-        assert len(ishape) > 1
-        inds = inds.reshape(ishape[0], -1)
-        used = self.used.to(inds)
-        match = (inds[:, :, None] == used[None, None, ...]).long()
-        new = match.argmax(-1)
-        unknown = match.sum(2) < 1
-        if self.unknown_index == "random":
-            new[unknown] = torch.randint(0, self.re_embed, size=new[unknown].shape).to(device=new.device)
-        else:
-            new[unknown] = self.unknown_index
-        return new.reshape(ishape)
-
-    def unmap_to_all(self, inds):
-        ishape = inds.shape
-        assert len(ishape) > 1
-        inds = inds.reshape(ishape[0], -1)
-        used = self.used.to(inds)
-        if self.re_embed > self.used.shape[0]:  # extra token
-            inds[inds >= self.used.shape[0]] = 0  # simply set to zero
-        back = torch.gather(used[None, :][inds.shape[0] * [0], :], 1, inds)
-        return back.reshape(ishape)
 
     def forward(self, z, temp=None, rescale_logits=False, return_logits=False):
         assert temp is None or temp == 1.0, "Only for interface compatible with Gumbel"
@@ -112,36 +73,9 @@ class VectorQuantizer(nn.Module):
         # reshape back to match original input shape
         z_q = rearrange(z_q, 'b h w c -> b c h w').contiguous()
 
-        if self.remap is not None:
-            min_encoding_indices = min_encoding_indices.reshape(z.shape[0], -1)  # add batch axis
-            min_encoding_indices = self.remap_to_used(min_encoding_indices)
-            min_encoding_indices = min_encoding_indices.reshape(-1, 1)  # flatten
-
-        if self.sane_index_shape:
-            min_encoding_indices = min_encoding_indices.reshape(z_q.shape[0], z_q.shape[2], z_q.shape[3])
-
         perplexity, cluster_use = self.measure_perplexity(min_encoding_indices, self.n_e)
 
-        return z_q, loss, perplexity, cluster_use
-
-    # return z_q, loss, (perplexity, min_encodings, min_encoding_indices)
-
-    def get_codebook_entry(self, indices, shape):
-        # shape specifying (batch, height, width, channel)
-        if self.remap is not None:
-            indices = indices.reshape(shape[0], -1)  # add batch axis
-            indices = self.unmap_to_all(indices)
-            indices = indices.reshape(-1)  # flatten again
-
-        # get quantized latent vectors
-        z_q = self.embedding(indices)
-
-        if shape is not None:
-            z_q = z_q.view(shape)
-            # reshape back to match original input shape
-            z_q = z_q.permute(0, 3, 1, 2).contiguous()
-
-        return z_q
+        return z_q, loss, perplexity, cluster_use, min_encoding_indices
 
     def init_codebook_by_clustering(self, features, evaluate_on_gpu=True, n_max=100000):
 
@@ -194,12 +128,12 @@ class MultiHeadVectorQuantizer(nn.Module):
     # NOTE: due to a bug the beta term was applied to the wrong term. for
     # backwards compatibility we use the buggy version by default, but you can
     # specify legacy=False to fix it.
-    def __init__(self, n_e, k_e, e_dim, beta, e_init='random_uniform', block_to_quantize=-1, remap=None, unknown_index="random",
-                 sane_index_shape=False, legacy=True):
+    def __init__(self, vq_arch, n_e, k_e, e_dim, beta, e_init='random_uniform', block_to_quantize=-1, legacy=True):
         super().__init__()
         self.n_e = n_e
         self.k_e = k_e
         self.e_dim = e_dim
+        self.vq_arch = vq_arch
 
         self.e_dim_seg = self.e_dim / self.k_e
         assert self.e_dim % self.k_e  == 0, "Assert feature dim is dividable by codeword dim."
@@ -214,21 +148,6 @@ class MultiHeadVectorQuantizer(nn.Module):
         if self.e_init == 'random_uniform':
             self.embedding.weight.data.uniform_(-100.0 / self.n_e, 100.0 / self.n_e)
 
-        self.remap = remap
-        if self.remap is not None:
-            self.register_buffer("used", torch.tensor(np.load(self.remap)))
-            self.re_embed = self.used.shape[0]
-            self.unknown_index = unknown_index  # "random" or "extra" or integer
-            if self.unknown_index == "extra":
-                self.unknown_index = self.re_embed
-                self.re_embed = self.re_embed + 1
-            print(f"Remapping {self.n_e} indices to {self.re_embed} indices. "
-                  f"Using {self.unknown_index} for unknown indices.")
-        else:
-            self.re_embed = n_e
-
-        self.sane_index_shape = sane_index_shape
-
         print(f'Initializeing VQ [MultiHeadVectorQuantization]')
         print(f'*** n_e = [{self.n_e}]')
         print(f'*** e_dim = [{self.e_dim}]')
@@ -238,31 +157,6 @@ class MultiHeadVectorQuantizer(nn.Module):
         print(f'*** block_to_quantize = [{self.block_to_quantize}]')
         print(f'*** beta = [{self.beta}]\n')
 
-    def remap_to_used(self, inds):
-        ishape = inds.shape
-        assert len(ishape) > 1
-        inds = inds.reshape(ishape[0], -1)
-        used = self.used.to(inds)
-        match = (inds[:, :, None] == used[None, None, ...]).long()
-        new = match.argmax(-1)
-        unknown = match.sum(2) < 1
-        if self.unknown_index == "random":
-            new[unknown] = torch.randint(0, self.re_embed, size=new[unknown].shape).to(device=new.device)
-        else:
-            new[unknown] = self.unknown_index
-        return new.reshape(ishape)
-
-    def unmap_to_all(self, inds):
-        ishape = inds.shape
-        assert len(ishape) > 1
-        inds = inds.reshape(ishape[0], -1)
-        used = self.used.to(inds)
-        if self.re_embed > self.used.shape[0]:  # extra token
-            inds[inds >= self.used.shape[0]] = 0  # simply set to zero
-        back = torch.gather(used[None, :][inds.shape[0] * [0], :], 1, inds)
-        return back.reshape(ishape)
-
-
     def forward(self, z, temp=None, rescale_logits=False, return_logits=False):
         assert temp is None or temp == 1.0, "Only for interface compatible with Gumbel"
         assert rescale_logits == False, "Only for interface compatible with Gumbel"
@@ -270,58 +164,63 @@ class MultiHeadVectorQuantizer(nn.Module):
 
         # reshape z -> (batch, height, width, channel) and flatten
         z = rearrange(z, 'b c h w -> b h w c').contiguous()
-        z_tmp = torch.reshape(z, (z.shape[0], z.shape[1], z.shape[2], self.k_e, self.e_dim_seg))
-        z_tmp = z_tmp.view(-1, self.e_dim_seg)
-        # distances from z to embeddings e_j (z - e)^2 = z^2 + e^2 - 2 e * z
+        z_shape = z.shape
+        z = torch.chunk(z, self.k_e, -1)
 
-        d = torch.sum(z_tmp ** 2, dim=1, keepdim=True) + \
-            torch.sum(self.embedding.weight ** 2, dim=1) - 2 * \
-            torch.einsum('bd,dn->bn', z_tmp, rearrange(self.embedding.weight, 'n d -> d n'))
+        embeds_tmp = self.embedding.weight
+        if 'normalize' in self.vq_arch:
+            embeds_tmp = torch.nn.functional.normalize(embeds_tmp, dim=-1)
 
-        min_encoding_indices = torch.argmin(d, dim=1)
-        z_q = self.embedding(min_encoding_indices).view(z_tmp.shape)
-        z_q = z_q.view(z.shape[0], z.shape[1], z.shape[2], -1)
+        all_z_sub_q = []
+        losses = []
+        for k, z_sub in enumerate(z):
 
-        # compute loss for embedding
-        if not self.legacy:
-            loss = self.beta * torch.mean((z_q.detach() - z) ** 2) + \
-                   torch.mean((z_q - z.detach()) ** 2)
-        else:
-            loss = torch.mean((z_q.detach() - z) ** 2) + self.beta * \
-                   torch.mean((z_q - z.detach()) ** 2)
+            if 'normalize' in self.vq_arch:
+                z_sub = torch.nn.functional.normalize(z_sub, dim=-1)
+            z_sub = z_sub.view(-1, self.e_dim_seg)
+
+            d = torch.sum(z_sub ** 2, dim=1, keepdim=True) + \
+                torch.sum(embeds_tmp ** 2, dim=1) - 2 * \
+                torch.einsum('bd,dn->bn', z_sub, rearrange(embeds_tmp, 'n d -> d n'))
+
+            min_encoding_indices = torch.argmin(d, dim=1)
+            z_sub_q = self.embedding(min_encoding_indices).view(z_shape[0], z_shape[1], z_shape[2], -1)
+            z_sub = z_sub.view(z_shape[0], z_shape[1], z_shape[2], -1)
+
+            all_z_sub_q.append(z_sub_q)
+
+            # compute loss for embedding
+            if not self.legacy:
+                loss_sub = self.beta * torch.mean((z_sub_q.detach() - z) ** 2) + \
+                       torch.mean((z_sub_q - z_sub.detach()) ** 2)
+            else:
+                loss_sub = torch.mean((z_sub_q.detach() - z_sub) ** 2) + self.beta * \
+                       torch.mean((z_sub_q - z_sub.detach()) ** 2)
+            losses.append(loss_sub)
+
+        z_q = torch.cat(all_z_sub_q, dim=-1)
+        z = torch.cat(z, dim=-1)
+        loss = torch.stack(losses).mean()
 
         # preserve gradients
         z_q = z + (z_q - z).detach()
         z_q = rearrange(z_q, 'b h w c -> b c h w').contiguous()
 
-        if self.remap is not None:
-            min_encoding_indices = min_encoding_indices.reshape(z.shape[0], -1)  # add batch axis
-            min_encoding_indices = self.remap_to_used(min_encoding_indices)
-            min_encoding_indices = min_encoding_indices.reshape(-1, 1)  # flatten
-
-        if self.sane_index_shape:
-            min_encoding_indices = min_encoding_indices.reshape(z_q.shape[0], z_q.shape[2], z_q.shape[3])
-
         perplexity, cluster_use = self.measure_perplexity(min_encoding_indices, self.n_e)
 
         return z_q, loss, perplexity, cluster_use, min_encoding_indices
 
-    def get_codebook_entry(self, indices, shape):
-        # shape specifying (batch, height, width, channel)
-        if self.remap is not None:
-            indices = indices.reshape(shape[0], -1)  # add batch axis
-            indices = self.unmap_to_all(indices)
-            indices = indices.reshape(-1)  # flatten again
 
-        # get quantized latent vectors
-        z_q = self.embedding(indices)
+    def split_feature_map(self, features):
+        z = rearrange(features, 'b c h w -> b h w c').contiguous()
+        z = torch.reshape(z, (z.shape[0], z.shape[1], z.shape[2], self.k_e, self.e_dim_seg))
 
-        if shape is not None:
-            z_q = z_q.view(shape)
-            # reshape back to match original input shape
-            z_q = z_q.permute(0, 3, 1, 2).contiguous()
+        z = z.view(z.shape[0], -1, self.e_dim_seg)
+        if 'normalize' in self.vq_arch:
+            z = torch.nn.functional.normalize(z, dim=-1)
 
-        return z_q
+        return z
+
 
     def init_codebook_by_clustering(self, features, evaluate_on_gpu=True, n_max=100000):
 
@@ -360,6 +259,90 @@ class MultiHeadVectorQuantizer(nn.Module):
 
         ### empty cache on GPU
         torch.cuda.empty_cache()
+
+    def measure_perplexity(self, predicted_indices, n_embed):  # eval cluster perplexity. when perplexity == num_embeddings then all clusters are used exactly equally
+        encodings = F.one_hot(predicted_indices, n_embed).float().reshape(-1, n_embed)
+        avg_probs = encodings.mean(0)
+        perplexity = (-(avg_probs * torch.log(avg_probs + 1e-10)).sum()).exp()
+        cluster_use = torch.sum(avg_probs > 0)
+        return perplexity, cluster_use
+
+
+class FactorizedVectorQuantizer(nn.Module):
+    """
+    Improved version over VectorQuantizer, can be used as a drop-in replacement. Mostly
+    avoids costly matrix multiplications and allows for post-hoc remapping of indices.
+    """
+
+    # NOTE: due to a bug the beta term was applied to the wrong term. for
+    # backwards compatibility we use the buggy version by default, but you can
+    # specify legacy=False to fix it.
+    def __init__(self, n_e, e_dim, e_dim_latent, beta, e_init='random_uniform', block_to_quantize=-1, legacy=True):
+        super().__init__()
+        self.n_e = n_e
+        self.e_dim = e_dim
+        self.e_dim_latent = e_dim_latent
+        self.beta = beta
+        self.legacy = legacy
+        self.e_init = e_init
+        self.block_to_quantize = block_to_quantize
+
+        # factorization projectors
+        self.proj_down = torch.nn.Linear(self.e_dim, self.e_dim_latent)
+        self.proj_up = torch.nn.Linear(self.e_dim_latent, self.e_dim)
+
+        self.embedding = nn.Embedding(self.n_e, self.e_dim_latent)
+        if self.e_init == 'random_uniform':
+            self.embedding.weight.data.uniform_(-100.0 / self.n_e, 100.0 / self.n_e)
+        elif self.e_init == 'random_gaussian':
+            self.embedding.weight.data.normal_(-100.0 / self.n_e, 100.0 / self.n_e)
+
+        print(f'Initializeing VQ [VectorQuantization]')
+        print(f'*** n_e = [{self.n_e}]')
+        print(f'*** e_dim = [{self.e_dim}]')
+        print(f'*** e_dim_latent = [{self.e_dim_latent}]')
+        print(f'*** e_init = [{self.e_init}]')
+        print(f'*** block_to_quantize = [{self.block_to_quantize}]')
+        print(f'*** beta = [{self.beta}]\n')
+
+    def forward(self, z, temp=None, rescale_logits=False, return_logits=False):
+        assert temp is None or temp == 1.0, "Only for interface compatible with Gumbel"
+        assert rescale_logits == False, "Only for interface compatible with Gumbel"
+        assert return_logits == False, "Only for interface compatible with Gumbel"
+        # reshape z -> (batch, height, width, channel) and flatten
+        z = rearrange(z, 'b c h w -> b h w c').contiguous()
+        z_latent = z.view(-1, self.e_dim)
+
+        #project into factorization space
+        z_latent = self.proj_down(z_latent)
+
+        d = torch.sum(z_latent ** 2, dim=1, keepdim=True) + \
+            torch.sum(self.embedding.weight ** 2, dim=1) - 2 * \
+            torch.einsum('bd,dn->bn', z_latent, rearrange(self.embedding.weight, 'n d -> d n'))
+
+        min_encoding_indices = torch.argmin(d, dim=1)
+        z_latent_q = self.embedding(min_encoding_indices)
+
+        # compute loss for embedding
+        if not self.legacy:
+            loss = self.beta * torch.mean((z_latent_q.detach() - z_latent) ** 2) + \
+                   torch.mean((z_latent_q - z_latent.detach()) ** 2)
+        else:
+            loss = torch.mean((z_latent_q.detach() - z_latent) ** 2) + self.beta * \
+                   torch.mean((z_latent_q - z_latent.detach()) ** 2)
+
+        # preserve gradients
+        z_latent_q = z_latent + (z_latent_q - z_latent).detach()
+
+        # back-project into embedding space
+        z_q = self.proj_up(z_latent_q).view(z.shape)
+
+        # reshape back to match original input shape
+        z_q = rearrange(z_q, 'b h w c -> b c h w').contiguous()
+
+        perplexity, cluster_use = self.measure_perplexity(min_encoding_indices, self.n_e)
+
+        return z_q, loss, perplexity, cluster_use, min_encoding_indices
 
     def measure_perplexity(self, predicted_indices, n_embed):  # eval cluster perplexity. when perplexity == num_embeddings then all clusters are used exactly equally
         encodings = F.one_hot(predicted_indices, n_embed).float().reshape(-1, n_embed)

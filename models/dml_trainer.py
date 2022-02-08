@@ -17,10 +17,10 @@ class DML_Model(pl.LightningModule):
         self.weight_decay = 0
         self.gamma = 0
         self.tau = 0
+        self.warmup_iterations = -1
 
         ## Load model using config
         self.model = instantiate_from_config(config["Architecture"])
-
         if self.model.VQ and self.model.e_init == 'feature_clustering':
             ## init dataloader:
             tmp_dataloader = instantiate_from_config(config["Optional_dataloader"]).val_dataloader()
@@ -73,7 +73,7 @@ class DML_Model(pl.LightningModule):
         ## Define one training step, the loss returned will be optimized
         inputs = batch[0]
         labels = batch[1]
-        output = self.model(inputs)
+        output = self.model(inputs, warmup=self.global_step < self.warmup_iterations)
         loss = self.loss(output['embeds'], labels, global_step=self.global_step, split="train") ## Change inputs to loss
         self.log("DML_Loss", loss, prog_bar=True, logger=True, on_step=False, on_epoch=True)  ## Add to progressbar
 
@@ -87,21 +87,21 @@ class DML_Model(pl.LightningModule):
         if self.global_step > 0:
             for name, param in self.model.named_parameters():
                 if (param.requires_grad) and ("bias" not in name) and param.grad is not None:
-                    mean_gradient_magnitude += param.grad.abs().mean().cpu().detach().numpy()
+                    mean_gradient_magnitude += param.grad.abs().mean().detach().cpu().numpy()
 
         out_dict = {"loss": loss, "av_grad_mag": mean_gradient_magnitude}
         if 'vq_perplexity' in output.keys():
-            vq_perp = float(output['vq_perplexity'].cpu().detach().numpy())
+            vq_perp = float(output['vq_perplexity'].detach().cpu().numpy())
             self.log("vq_perp", vq_perp, prog_bar=True, logger=False, on_step=False, on_epoch=True)
             out_dict['vq_perplexity'] = vq_perp
 
         if 'vq_cluster_use' in output.keys():
-            vq_clust_use = float(output['vq_cluster_use'].cpu().detach().numpy())
+            vq_clust_use = float(output['vq_cluster_use'].detach().cpu().numpy())
             self.log("vq_cl_use", vq_clust_use, prog_bar=True, logger=False, on_step=False, on_epoch=True)
             out_dict['vq_cluster_use'] = vq_clust_use
 
         if 'vq_indices' in output.keys():
-            vq_indices = output['vq_indices'].cpu().detach().numpy()
+            vq_indices = output['vq_indices'].detach().cpu().numpy()
             out_dict['vq_indices'] = vq_indices
 
         return out_dict
@@ -120,6 +120,7 @@ class DML_Model(pl.LightningModule):
             vq_cluster_use_avs = np.mean([x["vq_cluster_use"] for x in outputs])
             log_data = {**log_data, f"vq_cluster_use": vq_cluster_use_avs}
 
+        # Histogram logging seems to be very expensive...
         # if 'vq_indices' in outputs[0].keys():
             # vq_indices = [x["vq_indices"].tolist() for x in outputs]
             # vq_indices = list(chain.from_iterable(vq_indices))
@@ -140,15 +141,14 @@ class DML_Model(pl.LightningModule):
 
         with torch.no_grad():
             out = self.model(inputs)
-            embeds = out['embeds']  # {'embeds': z, 'avg_features': y, 'features': x, 'extra_embeds': prepool_y}
-            features = out['features']
-
+            embeds = out['embeds'].detach().cpu()
+            features = out['features'].detach().cpu()
 
         return {"embeds": embeds, "labels": labels, "features": features}
 
     def validation_epoch_end(self, outputs):
-        embeds = torch.cat([x["embeds"] for x in outputs]).cpu().detach()
-        labels = torch.cat([x["labels"] for x in outputs]).cpu().detach()
+        embeds = torch.cat([x["embeds"] for x in outputs])
+        labels = torch.cat([x["labels"] for x in outputs])
 
         # perform validation
         computed_metrics = self.metric_computer.compute_standard(embeds, labels, self.device)

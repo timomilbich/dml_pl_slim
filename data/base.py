@@ -69,21 +69,24 @@ class DataModuleFromConfig(pl.LightningDataModule):
                           batch_size=self.batch_size if not self.train_datasampler else 1,
                           num_workers=self.num_workers,
                           batch_sampler=datasampler,
-                          shuffle=not self.train_datasampler)
+                          shuffle=not self.train_datasampler,
+                          pin_memory=True)
 
     def _val_dataloader(self):
         datasampler = self._add_datasampler(dataset="validation") if self.val_datasampler else None # instantiate after ddp has been initialized to enable multi GPU training
         return DataLoader(self.datasets["validation"],
                           batch_size=self.batch_size if not self.val_datasampler else 1,
                           num_workers=self.num_workers,
-                          batch_sampler=datasampler)
+                          batch_sampler=datasampler,
+                          pin_memory=True)
 
     def _test_dataloader(self):
         datasampler = self._add_datasampler(dataset='test') if self.test_datasampler else None # instantiate after ddp has been initialized to enable multi GPU training
         return DataLoader(self.datasets["test"],
                           batch_size=self.batch_size if not self.test_datasampler else 1,
                           num_workers=self.num_workers,
-                          batch_sampler=datasampler)
+                          batch_sampler=datasampler,
+                          pin_memory=True)
 
     def _add_datasampler(self, dataset):
         config_datasampler = self.dataset_configs[dataset]["data_sampler"]
