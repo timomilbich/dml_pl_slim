@@ -22,7 +22,7 @@ class VectorQuantizer(nn.Module):
     # NOTE: due to a bug the beta term was applied to the wrong term. for
     # backwards compatibility we use the buggy version by default, but you can
     # specify legacy=False to fix it.
-    def __init__(self, n_e, e_dim, beta, e_init='random_uniform', block_to_quantize=-1, legacy=True):
+    def __init__(self, vq_arch, n_e, e_dim, beta, e_init='random_uniform', block_to_quantize=-1, legacy=True):
         super().__init__()
         self.n_e = n_e
         self.e_dim = e_dim
@@ -30,6 +30,7 @@ class VectorQuantizer(nn.Module):
         self.legacy = legacy
         self.e_init = e_init
         self.k_e = 1
+        self.vq_arch = vq_arch
         self.block_to_quantize = block_to_quantize
 
         self.embedding = nn.Embedding(self.n_e, self.e_dim)
@@ -52,12 +53,17 @@ class VectorQuantizer(nn.Module):
         z_flattened = z.view(-1, self.e_dim)
         # distances from z to embeddings e_j (z - e)^2 = z^2 + e^2 - 2 e * z
 
+        embeds_tmp = self.embedding.weight
+        if 'normalize' in self.vq_arch:
+            embeds_tmp = torch.nn.functional.normalize(embeds_tmp, dim=-1)
+            z_flattened = torch.nn.functional.normalize(z_flattened, dim=-1)
+
         d = torch.sum(z_flattened ** 2, dim=1, keepdim=True) + \
-            torch.sum(self.embedding.weight ** 2, dim=1) - 2 * \
-            torch.einsum('bd,dn->bn', z_flattened, rearrange(self.embedding.weight, 'n d -> d n'))
+            torch.sum(embeds_tmp ** 2, dim=1) - 2 * \
+            torch.einsum('bd,dn->bn', z_flattened, rearrange(embeds_tmp, 'n d -> d n'))
 
         min_encoding_indices = torch.argmin(d, dim=1)
-        z_q = self.embedding(min_encoding_indices).view(z.shape)
+        z_q = embeds_tmp(min_encoding_indices).view(z.shape)
 
         # compute loss for embedding
         if not self.legacy:
@@ -176,16 +182,16 @@ class MultiHeadVectorQuantizer(nn.Module):
         losses = []
         for k, z_sub in enumerate(z):
 
+            z_sub = z_sub.view(-1, self.e_dim_seg)
             if 'normalize' in self.vq_arch:
                 z_sub = torch.nn.functional.normalize(z_sub, dim=-1)
-            z_sub = z_sub.view(-1, self.e_dim_seg)
 
             d = torch.sum(z_sub ** 2, dim=1, keepdim=True) + \
                 torch.sum(embeds_tmp ** 2, dim=1) - 2 * \
                 torch.einsum('bd,dn->bn', z_sub, rearrange(embeds_tmp, 'n d -> d n'))
 
             min_encoding_indices = torch.argmin(d, dim=1)
-            z_sub_q = self.embedding(min_encoding_indices).view(z_shape[0], z_shape[1], z_shape[2], -1)
+            z_sub_q = embeds_tmp(min_encoding_indices).view(z_shape[0], z_shape[1], z_shape[2], -1)
             z_sub = z_sub.view(z_shape[0], z_shape[1], z_shape[2], -1)
 
             all_z_sub_q.append(z_sub_q)
@@ -278,7 +284,7 @@ class FactorizedVectorQuantizer(nn.Module):
     # NOTE: due to a bug the beta term was applied to the wrong term. for
     # backwards compatibility we use the buggy version by default, but you can
     # specify legacy=False to fix it.
-    def __init__(self, n_e, e_dim, e_dim_latent, beta, e_init='random_uniform', block_to_quantize=-1, legacy=True):
+    def __init__(self, vq_arch, n_e, e_dim, e_dim_latent, beta, e_init='random_uniform', block_to_quantize=-1, legacy=True):
         super().__init__()
         self.n_e = n_e
         self.e_dim = e_dim
@@ -287,6 +293,7 @@ class FactorizedVectorQuantizer(nn.Module):
         self.legacy = legacy
         self.e_init = e_init
         self.block_to_quantize = block_to_quantize
+        self.vq_arch = vq_arch
 
         # factorization projectors
         self.proj_down = torch.nn.Linear(self.e_dim, self.e_dim_latent)
