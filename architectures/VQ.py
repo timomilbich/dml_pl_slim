@@ -53,17 +53,13 @@ class VectorQuantizer(nn.Module):
         z_flattened = z.view(-1, self.e_dim)
         # distances from z to embeddings e_j (z - e)^2 = z^2 + e^2 - 2 e * z
 
-        embeds_tmp = self.embedding.weight
-        if 'normalize' in self.vq_arch:
-            embeds_tmp = torch.nn.functional.normalize(embeds_tmp, dim=-1)
-            z_flattened = torch.nn.functional.normalize(z_flattened, dim=-1)
-
         d = torch.sum(z_flattened ** 2, dim=1, keepdim=True) + \
-            torch.sum(embeds_tmp ** 2, dim=1) - 2 * \
-            torch.einsum('bd,dn->bn', z_flattened, rearrange(embeds_tmp, 'n d -> d n'))
+            torch.sum(self.embedding.weight ** 2, dim=1) - 2 * \
+            torch.einsum('bd,dn->bn', z_flattened, rearrange(self.embedding.weight, 'n d -> d n'))
 
         min_encoding_indices = torch.argmin(d, dim=1)
-        z_q = embeds_tmp(min_encoding_indices).view(z.shape)
+        z_q = self.embedding.weight(min_encoding_indices)
+        z_q = z_q.view(z.shape)
 
         # compute loss for embedding
         if not self.legacy:
@@ -175,23 +171,27 @@ class MultiHeadVectorQuantizer(nn.Module):
         z = torch.chunk(z, self.k_e, -1)
 
         embeds_tmp = self.embedding.weight
-        if 'normalize' in self.vq_arch:
-            embeds_tmp = torch.nn.functional.normalize(embeds_tmp, dim=-1)
+        # if 'normalize' in self.vq_arch:
+        #     embeds_tmp = torch.nn.functional.normalize(embeds_tmp, dim=-1)
 
         all_z_sub_q = []
         losses = []
         for k, z_sub in enumerate(z):
 
             z_sub = z_sub.view(-1, self.e_dim_seg)
-            if 'normalize' in self.vq_arch:
-                z_sub = torch.nn.functional.normalize(z_sub, dim=-1)
+            # if 'normalize' in self.vq_arch:
+            #     z_sub = torch.nn.functional.normalize(z_sub, dim=-1)
 
             d = torch.sum(z_sub ** 2, dim=1, keepdim=True) + \
                 torch.sum(embeds_tmp ** 2, dim=1) - 2 * \
                 torch.einsum('bd,dn->bn', z_sub, rearrange(embeds_tmp, 'n d -> d n'))
 
             min_encoding_indices = torch.argmin(d, dim=1)
-            z_sub_q = embeds_tmp(min_encoding_indices).view(z_shape[0], z_shape[1], z_shape[2], -1)
+            z_sub_q = self.embedding(min_encoding_indices)
+            # if 'normalize' in self.vq_arch:
+            #     z_sub_q = torch.nn.functional.normalize(z_sub_q, dim=-1)
+
+            z_sub_q = z_sub_q.view(z_shape[0], z_shape[1], z_shape[2], -1)
             z_sub = z_sub.view(z_shape[0], z_shape[1], z_shape[2], -1)
 
             all_z_sub_q.append(z_sub_q)
