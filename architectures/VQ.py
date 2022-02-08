@@ -170,26 +170,18 @@ class MultiHeadVectorQuantizer(nn.Module):
         z_shape = z.shape
         z = torch.chunk(z, self.k_e, -1)
 
-        embeds_tmp = self.embedding.weight
-        # if 'normalize' in self.vq_arch:
-        #     embeds_tmp = torch.nn.functional.normalize(embeds_tmp, dim=-1)
-
         all_z_sub_q = []
         losses = []
         for k, z_sub in enumerate(z):
 
             z_sub = z_sub.view(-1, self.e_dim_seg)
-            # if 'normalize' in self.vq_arch:
-            #     z_sub = torch.nn.functional.normalize(z_sub, dim=-1)
 
             d = torch.sum(z_sub ** 2, dim=1, keepdim=True) + \
-                torch.sum(embeds_tmp ** 2, dim=1) - 2 * \
-                torch.einsum('bd,dn->bn', z_sub, rearrange(embeds_tmp, 'n d -> d n'))
+                torch.sum(self.embedding.weight ** 2, dim=1) - 2 * \
+                torch.einsum('bd,dn->bn', z_sub, rearrange(self.embedding.weight, 'n d -> d n'))
 
             min_encoding_indices = torch.argmin(d, dim=1)
             z_sub_q = self.embedding(min_encoding_indices)
-            # if 'normalize' in self.vq_arch:
-            #     z_sub_q = torch.nn.functional.normalize(z_sub_q, dim=-1)
 
             z_sub_q = z_sub_q.view(z_shape[0], z_shape[1], z_shape[2], -1)
             z_sub = z_sub.view(z_shape[0], z_shape[1], z_shape[2], -1)
@@ -223,8 +215,6 @@ class MultiHeadVectorQuantizer(nn.Module):
         z = torch.reshape(z, (z.shape[0], z.shape[1], z.shape[2], self.k_e, self.e_dim_seg))
 
         z = z.view(z.shape[0], -1, self.e_dim_seg)
-        if 'normalize' in self.vq_arch:
-            z = torch.nn.functional.normalize(z, dim=-1)
 
         return z
 
