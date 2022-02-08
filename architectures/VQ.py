@@ -22,14 +22,14 @@ class VectorQuantizer(nn.Module):
     # NOTE: due to a bug the beta term was applied to the wrong term. for
     # backwards compatibility we use the buggy version by default, but you can
     # specify legacy=False to fix it.
-    def __init__(self, n_e, e_dim, beta, e_init='random_uniform', block_to_quantize=-1, remap=None, unknown_index="random",
-                 sane_index_shape=False, legacy=True):
+    def __init__(self, n_e, e_dim, beta, e_init='random_uniform', block_to_quantize=-1, legacy=True):
         super().__init__()
         self.n_e = n_e
         self.e_dim = e_dim
         self.beta = beta
         self.legacy = legacy
         self.e_init = e_init
+        self.k_e = 1
         self.block_to_quantize = block_to_quantize
 
         self.embedding = nn.Embedding(self.n_e, self.e_dim)
@@ -76,6 +76,7 @@ class VectorQuantizer(nn.Module):
         perplexity, cluster_use = self.measure_perplexity(min_encoding_indices, self.n_e)
 
         return z_q, loss, perplexity, cluster_use, min_encoding_indices
+
 
     def init_codebook_by_clustering(self, features, evaluate_on_gpu=True, n_max=100000):
 
