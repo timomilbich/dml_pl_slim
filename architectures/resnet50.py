@@ -30,23 +30,8 @@ class Network(torch.nn.Module):
         self.e_dim = e_dim
         self.k_e = k_e
         self.e_init = e_init
-
         self.block_to_quantize = block_to_quantize
-        if self.block_to_quantize < MAX_BLOCK_TO_QUANTIZE:
-            assert '1x1conv' not in self.arch, "Expected dimesionality of intermediate features must be kept."
-            self.e_dim = NUM_FEAT_PER_BLOCK[self.block_to_quantize]
-        elif self.block_to_quantize > MAX_BLOCK_TO_QUANTIZE:
-            raise Exception('Attempting to quantize non-existent resnet block [Max. number is 4.]!')
-
-        # Add Vector Quantization (Optionally)
-        if 'VQ_factorized' in self.VQ:
-            self.VectorQuantizer = FactorizedVectorQuantizer(self.VQ, self.n_e, self.e_dim, self.e_dim_latent, self.beta, self.e_init, self.block_to_quantize)
-        elif 'VQ_vanilla' in self.VQ:
-                self.VectorQuantizer = VectorQuantizer(self.VQ, self.n_e, self.e_dim, self.beta, self.e_init, self.block_to_quantize)
-        elif 'VQ_multihead' in self.VQ:
-            self.VectorQuantizer = MultiHeadVectorQuantizer(self.VQ, self.n_e, self.k_e, self.e_dim, self.beta, self.e_init, self.block_to_quantize)
-        else:
-            self.VQ = False
+        self.early_VQ = self.block_to_quantize < MAX_BLOCK_TO_QUANTIZE
 
         # Freeze all/part of the BatchNorm layers (Optionally)
         if 'frozenAll' in self.arch:
@@ -58,18 +43,37 @@ class Network(torch.nn.Module):
         elif 'frozen' in self.arch:
             self.freeze_all_batchnorm()
 
-        # Downsample final feature map (channel dim., Optionally)
-        embed_in_features_dim = self.model.last_linear.in_features
-        print(f'Initializing Architecture: [{self.arch}]\n*** embed_dims = [{self.embed_dim}]')
-        if '1x1conv' in self.arch:
-            assert self.e_dim > 0
-            print(f'*** 1x1conv dimensionality reduction: [2048 -> {self.e_dim}]\n')
-            embed_in_features_dim = self.e_dim
-            self.conv_reduce = nn.Conv2d(in_channels=2048, out_channels=self.e_dim, kernel_size=1, stride=1, padding=0)
-        else:
-            print(f'\n')
-            self.conv_reduce = nn.Identity()
+        assert self.block_to_quantize <= MAX_BLOCK_TO_QUANTIZE, 'Attempting to quantize non-existent resnet block [Max. number is 4.]!'
 
+        # Whether to use the downsmpling 1x1 conv layer
+        # NOTE: for intermediate block (1,2,3), there will be an extra upsampling conv layer added into the network.
+        if '1x1conv' not in self.arch:
+            # use the same dim as in a standard ResNet
+            self.e_dim = NUM_FEAT_PER_BLOCK[self.block_to_quantize]
+            self.conv_reduce = nn.Identity()
+            self.conv_increase = nn.Identity()
+        else:
+            print(f'*** 1x1conv dimensionality reduction in BLOCK-{self.block_to_quantize}: [{NUM_FEAT_PER_BLOCK[self.block_to_quantize]} -> {self.e_dim}]\n')
+            # dim before the VQ block
+            dim_preVQ = NUM_FEAT_PER_BLOCK[self.block_to_quantize]
+            self.conv_reduce = nn.Conv2d(in_channels=dim_preVQ, out_channels=self.e_dim, kernel_size=1, stride=1, padding=0)
+            self.conv_increase = nn.Conv2d(in_channels=self.e_dim, out_channels=dim_preVQ, kernel_size=1, stride=1, padding=0) if self.early_VQ else nn.Identity()
+
+        # Add Vector Quantization (Optionally)
+        if 'VQ_factorized' in self.VQ:
+            self.VectorQuantizer = FactorizedVectorQuantizer(self.VQ, self.n_e, self.e_dim, self.e_dim_latent, self.beta, self.e_init, self.block_to_quantize)
+        elif 'VQ_vanilla' in self.VQ:
+                self.VectorQuantizer = VectorQuantizer(self.VQ, self.n_e, self.e_dim, self.beta, self.e_init, self.block_to_quantize)
+        elif 'VQ_multihead' in self.VQ:
+            self.VectorQuantizer = MultiHeadVectorQuantizer(self.VQ, self.n_e, self.k_e, self.e_dim, self.beta, self.e_init, self.block_to_quantize)
+        else:
+            self.VQ = False
+
+        # Downsample final feature map (channel dim., Optionally)
+        # the ouput shape of the final block stays the same when using early_VQ
+        embed_in_features_dim = self.model.last_linear.in_features if self.early_VQ else self.e_dim
+        print(f'Initializing Architecture: [{self.arch}]\n*** embed_dims = [{self.embed_dim}]')
+        
         # Add embedding layer
         self.model.last_linear = torch.nn.Linear(embed_in_features_dim, embed_dim)
         self.layer_blocks = nn.ModuleList([self.model.layer1, self.model.layer2, self.model.layer3, self.model.layer4])
@@ -99,6 +103,8 @@ class Network(torch.nn.Module):
                         perplexity = 0
                         cluster_use = 0
                         vq_indices = 0
+                x = self.conv_increase(x)
+                    
                 ##########
 
         if self.pool_aux is not None:
