@@ -34,14 +34,14 @@ class Network(torch.nn.Module):
         self.early_VQ = self.block_to_quantize < MAX_BLOCK_TO_QUANTIZE
 
         # Freeze all/part of the BatchNorm layers (Optionally)
-        if 'frozenAll' in self.arch:
+        if 'frozenAll' or 'frozen' in self.arch:
             self.freeze_all_batchnorm()
         elif 'frozenPart' in self.arch:
             self.freeze_and_remove_batchnorm()
         elif 'frozen_bn2ln' in self.arch:
             self.freeze_and_bn_to_ln()
-        elif 'frozen' in self.arch:
-            self.freeze_all_batchnorm()
+        elif 'onlyBN' in self.arch:
+            self.frreze_all_but_bn()
 
         assert self.block_to_quantize <= MAX_BLOCK_TO_QUANTIZE, 'Attempting to quantize non-existent resnet block [Max. number is 4.]!'
 
@@ -79,7 +79,7 @@ class Network(torch.nn.Module):
         self.layer_blocks = nn.ModuleList([self.model.layer1, self.model.layer2, self.model.layer3, self.model.layer4])
 
         # Select pooling strategy
-        self.pool_base = torch.nn.AdaptiveAvgPool2d(1)
+        self.pool_base = torch.nn.AdaptiveMaxPool2d(1) if 'maxpool' in self.arch else torch.nn.AdaptiveAvgPool2d(1)
         self.pool_aux  = torch.nn.AdaptiveMaxPool2d(1) if 'double' in self.arch else None
 
     def forward(self, x, warmup=False, quantize=True, **kwargs):
@@ -141,6 +141,20 @@ class Network(torch.nn.Module):
                 else: # freeze BN layers
                     layer.eval()
                     layer.train = lambda _: None
+    
+    def frreze_all_but_bn(self):
+        # for ablation on training only batch norm layer's param
+        for _, layer in self.model.named_modules():
+            if not isinstance(layer, nn.BatchNorm2d):
+                if hasattr(layer, 'weight') and layer.weight is not None:
+                    layer.weight.requires_grad_(False)
+                    # these two have to be inseide the if, otherwise the whole network would be send to not trainable, as the first layer is ResNet.
+                    # try to print them out and you will know
+                    layer.eval()
+                    layer.train = lambda _: None
+                if hasattr(layer, 'bias') and layer.bias is not None:
+                    layer.bias.requires_grad_(False)
+
 
     def freeze_all_batchnorm(self):
         for module in filter(lambda m: type(m) == nn.BatchNorm2d, self.model.modules()):
