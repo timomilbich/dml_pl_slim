@@ -134,17 +134,6 @@ if __name__ == "__main__":
 
     now = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 
-    # parser_kwargs_set = [
-    # "--gpus", "0,",
-    # "--base", "configs/marginloss.yaml",
-    # "--savename" , "test",
-    # "--debug", "True",
-    # "--overfit_batches", "10",
-    # "--limit_train_batches", "0.2",
-    # "--limit_val_batches", "0.2",
-    # "--track_grad_norm", "2",
-    # "--fast_dev_run", "3", #runs n train, val and test batches
-    # ]
 
     parser = get_parser()
     parser = Trainer.add_argparse_args(parser)

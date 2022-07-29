@@ -17,27 +17,28 @@ NUM_FEAT_PER_BLOCK = {
 }
 
 class Network(torch.nn.Module):
-    def __init__(self, arch, pretraining, embed_dim, VQ, n_e=1000, beta=0.25, e_dim=1024, k_e=1, e_init='random_uniform', block_to_quantize=4):
+    def __init__(self, arch, pretraining, embed_dim, VQ, n_e=1000, beta=0.25, e_dim=1024, k_e=1, e_init='random_uniform', block_to_quantize=4, bn_layers=[4.2, 4.1]):
         super(Network, self).__init__()
 
         self.arch = arch
         self.embed_dim = embed_dim
         self.model = ptm.__dict__['resnet50'](num_classes=1000, pretrained=pretraining if pretraining=='imagenet' else None)
         self.name = self.arch
+        self.bn_layers = bn_layers
         self.VQ = VQ
-        self.n_e = n_e
+        self.n_e = n_e # number of codewords
         self.beta = beta
-        self.e_dim = e_dim
-        self.k_e = k_e
+        self.e_dim = e_dim # feat_dim to fead into VQ
+        self.k_e = k_e # number of heads -> e_dim/k_e = e_dim_seg
         self.e_init = e_init
         self.block_to_quantize = block_to_quantize
         self.early_VQ = self.block_to_quantize < MAX_BLOCK_TO_QUANTIZE
 
         # Freeze all/part of the BatchNorm layers (Optionally)
-        if 'frozenAll' or 'frozen' in self.arch:
+        if 'frozenAll' in self.arch:
             self.freeze_all_batchnorm()
         elif 'frozenPart' in self.arch:
-            self.freeze_and_remove_batchnorm()
+            self.freeze_and_remove_batchnorm(self.bn_layers)
         elif 'frozen_bn2ln' in self.arch:
             self.freeze_and_bn_to_ln()
         elif 'onlyBN' in self.arch:
@@ -126,8 +127,9 @@ class Network(torch.nn.Module):
         else:
             return {'embeds': z, 'avg_features': y, 'features': x, 'extra_embeds': prepool_y}
 
-    def freeze_and_remove_batchnorm(self):
-        layers_to_remove = ['layer4.2', 'layer4.1']
+    def freeze_and_remove_batchnorm(self, layers):
+        # layers_to_remove = ['layer4.2', 'layer4.1']
+        layers_to_remove = [f'layer{l}' for l in layers]
 
         for name, layer in self.model.named_modules():
             if isinstance(layer, nn.BatchNorm2d):

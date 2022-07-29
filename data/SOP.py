@@ -30,6 +30,7 @@ class DATA(Dataset):
 
         super(DATA, self).__init__()
 
+        # new nfs /export/home/pima/scratch/dataset/sop/
         self.train = train  # training set or test set
         self.root = "/export/home/tmilbich/Datasets/online_products/" if root is None else root
         self.n_classes = 11318 # number of train classes
