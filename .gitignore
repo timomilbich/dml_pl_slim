@@ -127,6 +127,9 @@ venv.bak/
 .spyderproject
 .spyproject
 
+# vscode settings
+.vscode/
+
 # Rope project settings
 .ropeproject
 
@@ -146,3 +149,6 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+# w&b
+wandb/

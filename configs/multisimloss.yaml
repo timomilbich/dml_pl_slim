@@ -18,10 +18,12 @@ model:
           VQ: None
           e_init: 'random_uniform'
           n_e: 1000
-          e_dim: 1024
+          e_dim: 2048
           k_e: 1
           beta: 0.25
           block_to_quantize: 4 # currently only applicable for ResNet50 backbone
+          # vq_lrmulti: 1
+          # ca_n_heads: 1 # should be only used when apply CA
 
       Loss:
         target: criteria.select
@@ -95,7 +97,7 @@ data:
 lightning:
   trainer:
 #    strategy: 'ddp' #
-    replace_sampler_ddp: False
+    replace_sampler_ddp: False  # check https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html#replace-sampler-ddp
     accumulate_grad_batches: 1
     auto_scale_batch_size: false
     benchmark: False
@@ -107,12 +109,12 @@ lightning:
     max_epochs: 100
     num_sanity_val_steps: 0
     precision: 32
-
+# change the wandb_key and project_name accordingly to each user
   logger:
     target: pytorch_lightning.loggers.WandbLogger
     params:
-      wandb_key: d84d1363e77cf0020a24401aaac1ad22ed7b3388
-      project: VQ-DML
+      wandb_key: c08545c2065a769a9d1ca641c39ed680e8bfb752
+      project: vq_dml
       group: Debug
       savename:
 
