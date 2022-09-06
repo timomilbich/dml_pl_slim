@@ -95,7 +95,7 @@ class Network(torch.nn.Module):
         self.latents = nn.Parameter(torch.randn(1, self.ca_latent_dim))
 
         # when ca_n_heads == 1, the latent_dim = inner_dim
-        self.cross_attn = PreNorm(self.ca_latent_dim, Attention2(self.ca_latent_dim, self.ca_input_dim, heads=self.ca_n_heads, dim_head=self.ca_head_dim), context_dim=self.ca_input_dim, type_norm='ln')
+        self.cross_attn = PreNorm(self.ca_latent_dim, Attention3(self.ca_latent_dim, self.ca_input_dim, heads=self.ca_n_heads, dim_head=self.ca_head_dim), context_dim=self.ca_input_dim, type_norm='ln')
         # self.cross_attn_ff = PreNorm(self.cross_att_latent_dim, FeedForward(self.cross_att_latent_dim))
 
         print(f'*** ca_input_dim = [{self.ca_input_dim}]')
@@ -109,6 +109,8 @@ class Network(torch.nn.Module):
         # Add embedding layer
         if 'direct' not in self.arch:
             self.model.last_linear = torch.nn.Linear(embed_in_features_dim, embed_dim)
+        elif 'directLinear' in self.arch:
+            self.model.last_linear = torch.nn.Linear(self.ca_latent_dim, embed_dim)
         else:
             assert self.ca_latent_dim == self.embed_dim, "make sure selected embed dim is maintained!"
 
@@ -130,6 +132,7 @@ class Network(torch.nn.Module):
 
             if (k+1) == self.block_to_quantize:
                 x = self.conv_reduce(x) # if unspecified in init, nn.Identity() is used
+                # prepool_y is the continuous feature here
                 prepool_y = x
 
                 # VQ features #########
@@ -143,13 +146,22 @@ class Network(torch.nn.Module):
                         vq_indices = 0
                 ##########
 
+        # stop here when we only need backbone tokens for initializing the codebook        
+        if not quantize:
+            return {'extra_embeds': prepool_y}
+        
         if warmup:
             x = x.detach()
 
         # cross attention, x is the output from backbone + VQ
         x = rearrange(x, 'b c h w -> b h w c').contiguous()
         x = x.view(x.shape[0], -1, self.ca_input_dim)
-        y = self.cross_attn(y, context=x, mask=None) # + y #
+        
+        # the rearranged continuous feature
+        x_con = rearrange(prepool_y, 'b c h w -> b h w c').contiguous()
+        x_con = x_con.view(x_con.shape[0], -1, self.ca_input_dim)
+
+        y = self.cross_attn(y, context_k=x, context_v=x_con) # + y #
 
 
         # map to embedding space
@@ -231,7 +243,8 @@ class PreNorm(nn.Module):
             self.norm_context = nn.GroupNorm(2, context_dim) if exists(context_dim) else None
 
     def forward(self, x, **kwargs):
-
+        
+        # x here is basically the query for CA module
         if self.type_norm == 'ln':
             x = self.norm(x)
         elif self.type_norm == 'gn':
@@ -240,15 +253,18 @@ class PreNorm(nn.Module):
             x = x.permute(0, 2, 1)
 
         if exists(self.norm_context):
-            context = kwargs['context']
+            context_k = kwargs['context_k']
+            context_v = kwargs['context_v']
 
             if self.type_norm == 'ln':
-                normed_context = self.norm_context(context)
-            elif self.type_norm == 'gn':
-                normed_context = context.permute(0, 2, 1)
-                normed_context = self.norm_context(normed_context)
-                normed_context = normed_context.permute(0, 2, 1)
-            kwargs.update(context=normed_context)
+                normed_context_k = self.norm_context(context_k)
+                normed_context_v = self.norm_context(context_v)
+            # elif self.type_norm == 'gn':
+            #     normed_context = context.permute(0, 2, 1)
+            #     normed_context = self.norm_context(normed_context)
+            #     normed_context = normed_context.permute(0, 2, 1)
+            kwargs.update(context_k=normed_context_k)
+            kwargs.update(context_v=normed_context_v)
 
         return self.fn(x, **kwargs)
 
@@ -338,6 +354,47 @@ class Attention2(nn.Module):
         # k = self.to_k(k)
         k = rearrange(k, 'b n (h d) -> b h n d', h=self.heads)
         # v = self.to_v(v)
+        v = rearrange(v, 'b n (h d) -> b h n d', h=self.heads)
+
+        sim = einsum('b h i d, b h j d -> b h i j', q, k) * self.scale
+        attn = sim.softmax(dim=-1)
+        out = einsum('b h i j, b h j d -> b h i d', attn, v)
+        out = rearrange(out, 'b h n d -> b n (h d)')
+        # out =  self.to_out(out)
+
+        return out
+
+
+
+class Attention3(nn.Module):
+    ''' The attention class to merge continuous and vq features, 
+    the only difference from Attention2 is that it takes 2 contexts 
+    instead of one, one direct from backbone one from vq.
+    '''
+    def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, dropout=0.):
+        super().__init__()
+        inner_dim = dim_head * heads
+        context_dim = default(context_dim, query_dim)
+
+        # the sqrt(d)
+        self.scale = dim_head ** -0.5
+        self.heads = heads
+
+        self.to_q = nn.Linear(query_dim, inner_dim, bias=False)
+        self.to_k = nn.Linear(context_dim, inner_dim, bias=False)
+        self.to_v = nn.Linear(context_dim, inner_dim, bias=False)
+
+
+    def forward(self, x, context_k=None, context_v=None):
+        q = self.to_q(x)
+        q = rearrange(q, 'b n (h d) -> b h n d', h=self.heads)
+
+        context_k = default(context_k, x)
+        context_v = default(context_v, x)
+        k = self.to_k(context_k)
+        v = self.to_v(context_v)
+
+        k = rearrange(k, 'b n (h d) -> b h n d', h=self.heads)
         v = rearrange(v, 'b n (h d) -> b h n d', h=self.heads)
 
         sim = einsum('b h i d, b h j d -> b h i j', q, k) * self.scale

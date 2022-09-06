@@ -43,6 +43,8 @@ class Network(torch.nn.Module):
             self.freeze_and_bn_to_ln()
         elif 'onlyBN' in self.arch:
             self.frreze_all_but_bn()
+        elif 'frozen' in self.arch:
+            self.freeze_all_batchnorm()
 
         assert self.block_to_quantize <= MAX_BLOCK_TO_QUANTIZE, 'Attempting to quantize non-existent resnet block [Max. number is 4.]!'
 
