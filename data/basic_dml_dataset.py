@@ -10,6 +10,12 @@ class BaseDataset(Dataset):
         self.is_validation = is_validation
         self.arch        = arch
         self.path_ooDML_splits = None
+        self.random_erasing = "RE" in arch
+        if self.random_erasing:
+            if "REorig" in arch:
+                random_erasing = transforms.RandomErasing(p=0.5, scale=(0.02, 0.4), value=(0.4914, 0.4822, 0.4465))
+            else:
+                random_erasing = transforms.RandomErasing(p=0.5, scale=(0.02, 0.4))
         if "imSize" in self.arch:
             # quick hack to change the image size
             self.crop_size = int(self.arch[self.arch.find("imSize")+6:])
@@ -41,7 +47,16 @@ class BaseDataset(Dataset):
         else:
             self.normal_transform.extend([transforms.Resize(self.resize), transforms.CenterCrop(crop_im_size)])
         self.normal_transform.extend([transforms.ToTensor(), normalize])
+        if self.random_erasing:
+            if not self.is_validation:
+                print("Using random erasing during training\n")
+                self.normal_transform.extend([random_erasing])
         self.normal_transform = transforms.Compose(self.normal_transform)
+
+        if not self.is_validation:
+            print(f"training augmentation: {self.normal_transform}\n")
+        else:
+            print(f'inference augmentation: {self.normal_transform}\n')
 
     def init_setup(self):
         self.n_files       = np.sum([len(self.image_dict[key]) for key in self.image_dict.keys()])

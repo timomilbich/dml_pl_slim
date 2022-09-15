@@ -17,7 +17,7 @@ NUM_FEAT_PER_BLOCK = {
 }
 
 class Network(torch.nn.Module):
-    def __init__(self, arch, pretraining, embed_dim, VQ, n_e=1000, beta=0.25, e_dim=1024, k_e=1, e_init='random_uniform', block_to_quantize=4, bn_layers=[4.2, 4.1]):
+    def __init__(self, arch, pretraining, embed_dim, VQ, n_e=1000, beta=0.25, e_dim=1024, k_e=1, e_init='random_uniform', block_to_quantize=4, bn_layers=[4.2, 4.1],  **kwargs):
         super(Network, self).__init__()
 
         self.arch = arch
