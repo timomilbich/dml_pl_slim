@@ -1,6 +1,7 @@
 model:
   type_optim: 'adam' # added on 09.01.2022
   base_learning_rate: 0.00001
+  warmup_iterations: -1
   weight_decay: 0.0004
   gamma: 0.3
   tau: [1000]
@@ -14,12 +15,13 @@ model:
           pretraining: "imagenet"
           embed_dim: -1 # 512
           arch: "resnet50_frozen_normalize" #"bninception_frozen_normalize", vit_small_patch16_224_normalize
-          VQ: True
+          VQ: None
           e_init: 'random_uniform'
           n_e: 1000
-          e_dim: 1024
+          e_dim: 2048
           k_e: 1
           beta: 0.25
+          block_to_quantize: 4 
 
       Loss:
         target: criteria.select
@@ -96,7 +98,7 @@ data:
 
 lightning:
   trainer:
-    accelerator: 'ddp'
+    # accelerator: 'ddp'
     replace_sampler_ddp: False
     # accumulate_grad_batches: 1
     auto_scale_batch_size: false
@@ -112,9 +114,9 @@ lightning:
   logger:
     target: pytorch_lightning.loggers.WandbLogger
     params:
-      wandb_key: d84d1363e77cf0020a24401aaac1ad22ed7b3388
-      project: VQ-DML
-      group:
+      wandb_key: c08545c2065a769a9d1ca641c39ed680e8bfb752
+      project: vq_dml
+      group: Debug
       savename:
 
   modelcheckpoint:
@@ -124,7 +126,7 @@ lightning:
       filename: 'recall@1{val/e_recall@1:.4f}'
       monitor: 'val/e_recall@1'
       mode: max
-      every_n_val_epochs: 1
+      every_n_epochs: 1
       verbose: True
       save_last: True
       save_top_k: 1

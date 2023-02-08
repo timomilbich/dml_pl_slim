@@ -97,7 +97,3 @@ class DataModuleFromConfig(pl.LightningDataModule):
         return instantiate_from_config(config_datasampler)
 
 
-
-    # def prepare_data(self):
-    #     for data_cfg in self.dataset_configs.values():
-    #         instantiate_from_config(data_cfg)

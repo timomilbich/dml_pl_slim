@@ -22,6 +22,8 @@ model:
           k_e: 1
           beta: 0.25
           block_to_quantize: 4 # currently only applicable for ResNet50 backbone
+          M_reestim: 999
+          M_max: 50
           # vq_lrmulti: 1
           # ca_n_heads: 1 # should be only used when apply CA
 
@@ -65,7 +67,7 @@ model:
               root:
               train: True
               ooDML_split_id: -1
-              arch: "resnet50_frozen_normalize" # vit_small_patch16_224_normalize
+              arch: "resnet50_frozen_normalize"
 
 data:
   target: data.base.DataModuleFromConfig
@@ -108,7 +110,7 @@ lightning:
     check_val_every_n_epoch: 1
     max_epochs: 100
     num_sanity_val_steps: 0
-    precision: 32
+    precision: 16
 # change the wandb_key and project_name accordingly to each user
   logger:
     target: pytorch_lightning.loggers.WandbLogger
